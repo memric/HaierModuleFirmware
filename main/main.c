@@ -14,13 +14,15 @@
 #define WIFI_CONNECTED_BIT	BIT0
 #define WIFI_FAIL_BIT		BIT1
 
-#define LED_PIN				2
+#define LED_PIN				7
 
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_num = 0;
-
+static TimerHandle_t reconnTimer = NULL;
 static const char *TAG = "MAIN";
+
+void reconnectTimerCallback(TimerHandle_t xTimer);
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
@@ -61,6 +63,12 @@ void app_main(void)
 		ret = nvs_flash_init();
 	}
 	ESP_ERROR_CHECK(ret);
+
+	/*Create reconnect timer*/
+    reconnTimer = xTimerCreate("Reconnect",
+                               60 * 1000 / portTICK_PERIOD_MS,
+                               pdFALSE, 0,
+                               reconnectTimerCallback);
 
 	ESP_ERROR_CHECK(esp_netif_init());
 
@@ -131,6 +139,9 @@ void app_main(void)
     		else if (bits & WIFI_FAIL_BIT)
     		{
     			ESP_LOGI(TAG, "Failed to connect to SSID:%s", CONFIG_ESP_WIFI_PASSWORD);
+				ESP_LOGI(TAG, "Will try to reconnect 1 min later");
+
+                xTimerStart(reconnTimer, 0);
     		}
     	}
 
@@ -139,3 +150,8 @@ void app_main(void)
     }
 }
 
+void reconnectTimerCallback(TimerHandle_t xTimer)
+{
+    esp_wifi_connect();
+    s_retry_num = 0;
+}
