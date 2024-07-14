@@ -7,6 +7,7 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "telegram_bot.h"
+#include "haier.h"
 
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
@@ -14,7 +15,7 @@
 #define WIFI_CONNECTED_BIT	BIT0
 #define WIFI_FAIL_BIT		BIT1
 
-#define LED_PIN				7
+#define LED_PIN				GPIO_NUM_7
 
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
@@ -63,6 +64,9 @@ void app_main(void)
 		ret = nvs_flash_init();
 	}
 	ESP_ERROR_CHECK(ret);
+
+	/* Init Haier interface */
+	Haier_Init();
 
 	/*Create reconnect timer*/
     reconnTimer = xTimerCreate("Reconnect",

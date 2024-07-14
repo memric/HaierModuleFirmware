@@ -2,3 +2,7 @@
 sdkconfig.old
 sdkconfig
 /build/
+
+.vscode/settings.json
+Haier/.devcontainer
+Haier/.vscode
