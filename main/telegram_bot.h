@@ -11,6 +11,5 @@
 #include "haier.h"
 
 void TeleBot_Init(void);
-void TeleBot_SetState(state_queue_t state);
 
 #endif /* MAIN_TELEGRAM_BOT_H_ */

@@ -5,14 +5,14 @@
  *      Author: chudnikov
  */
 
-#include "cJSON/cJSON.h"
 #include "telegram_bot.h"
+#include "cJSON/cJSON.h"
 #include "esp_crt_bundle.h"
 #include "esp_log.h"
 #include "esp_tls.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "freertos/queue.h"
+#include "freertos/task.h"
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -35,11 +35,12 @@
 #define OFF_BTN_STR      "OFF"
 #define STATE_BTN_STR    "STATE"
 
-#define CHAT_ID          243661148
+#ifndef CONFIG_TG_CHAT_ID
+#define CONFIG_TG_CHAT_ID 1
+#endif
 
 static const char *TAG           = "TELEGRAM";
 static TaskHandle_t telebot_task = NULL;
-static QueueHandle_t state_queue = NULL;
 
 #if !USE_TLS_BUNDLE
 extern const uint8_t telegram_cert_pem_start[] asm("_binary_telegram_cert_pem_start");
@@ -63,13 +64,6 @@ void TeleBot_MessageCallback(uint32_t chat_id, const char *msg);
  */
 void TeleBot_Init(void)
 {
-    state_queue = xQueueCreate(5, sizeof(state_queue_t));
-
-    if (state_queue == NULL)
-    {
-        return;
-    }
-
     xTaskCreate(TeleBot_Task, "Telegram Bot", 1024 * 6, NULL, 3, &telebot_task);
 }
 
@@ -422,9 +416,11 @@ static void TeleBot_Task(void *arg)
 
             cJSON_AddItemToObject(mainMarkup, "keyboard", btns);
         }
+
+        cJSON_AddBoolToObject(mainMarkup, "resize_keyboard", 1);
     }
 
-    TeleBot_SendMessage(CHAT_ID, "Bot started", mainMarkup);
+    TeleBot_SendMessage(CONFIG_TG_CHAT_ID, "Bot started", mainMarkup);
 
     while (1)
     {
@@ -436,7 +432,7 @@ static void TeleBot_Task(void *arg)
             memset(resp, 0, resp_len);
         }
 
-        if (xQueueReceive(state_queue, &haier_state, 10 / portTICK_PERIOD_MS) == pdTRUE)
+        if (Haier_GetState(&haier_state, 10 / portTICK_PERIOD_MS) == 0)
         {
             int resp_len =
                 snprintf(resp_msg, sizeof(resp_msg), "Temp: %i; Set temp: %i; Mode: %i; Fan: %i", haier_state.temp_curr,
@@ -445,7 +441,7 @@ static void TeleBot_Task(void *arg)
             if (resp_len > 0)
             {
                 resp_msg[resp_len] = 0;
-                TeleBot_SendMessage(CHAT_ID, resp_msg, mainMarkup);
+                TeleBot_SendMessage(CONFIG_TG_CHAT_ID, resp_msg, mainMarkup);
             }
         }
 
@@ -458,7 +454,7 @@ static void TeleBot_Task(void *arg)
  */
 void TeleBot_MessageCallback(uint32_t chat_id, const char *msg)
 {
-    if (chat_id != CHAT_ID)
+    if (chat_id != CONFIG_TG_CHAT_ID)
         return;
 
     ESP_LOGI(TAG, "Message from %" PRIu32 ": %s", chat_id, msg);
@@ -482,12 +478,5 @@ void TeleBot_MessageCallback(uint32_t chat_id, const char *msg)
     {
         TeleBot_SendMessage(chat_id, "Unresolved command: ", mainMarkup);
         TeleBot_SendMessage(chat_id, msg, mainMarkup);
-    }
-}
-
-void TeleBot_SetState(state_queue_t state)
-{
-    if (xQueueSend(state_queue, &state, 10) == pdTRUE)
-    {
     }
 }

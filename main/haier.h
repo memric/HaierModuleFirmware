@@ -1,6 +1,7 @@
 #ifndef HAIER_H_
 #define HAIER_H_
 
+#include "freertos/FreeRTOS.h"
 #include <stdint.h>
 
 typedef enum
@@ -21,5 +22,6 @@ typedef struct
 
 uint32_t Haier_Init(void);
 uint32_t Haier_Cmd(uint8_t c);
+uint32_t Haier_GetState(state_queue_t *state, TickType_t timeout);
 
 #endif /*HAIER_H_*/

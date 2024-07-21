@@ -2,10 +2,8 @@
 #include "driver/gpio.h"
 #include "driver/uart.h"
 #include "esp_log.h"
-#include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
-#include "telegram_bot.h"
 
 #ifndef CONFIG_HAIER_UART_PORT
 #define CONFIG_HAIER_UART_PORT UART_NUM_1
@@ -56,11 +54,12 @@ typedef struct
     uint16_t param;
 } cmd_queue_t;
 
-static const char *TAG = "HAIER";
-static QueueHandle_t uart_queue;
-static QueueHandle_t cmd_queue;
-static TaskHandle_t haier_task = NULL;
-static uint8_t tx_buff[128]    = {0xFF, 0xFF, 0};
+static const char *TAG           = "HAIER";
+static QueueHandle_t uart_queue  = NULL;
+static QueueHandle_t cmd_queue   = NULL;
+static QueueHandle_t state_queue = NULL;
+static TaskHandle_t haier_task   = NULL;
+static uint8_t tx_buff[128]      = {0xFF, 0xFF, 0};
 static uint8_t rx_buff[128];
 
 static void Haier_Task(void *arg);
@@ -102,9 +101,10 @@ uint32_t Haier_Init(void)
     // uart_pattern_queue_reset(CONFIG_HAIER_UART_PORT, UART_EVENT_QUEUE_SIZE);
     // uart_flush(CONFIG_HAIER_UART_PORT);
 
-    cmd_queue = xQueueCreate(5, sizeof(cmd_queue_t));
+    cmd_queue   = xQueueCreate(5, sizeof(cmd_queue_t));
+    state_queue = xQueueCreate(5, sizeof(state_queue_t));
 
-    if (cmd_queue == NULL)
+    if (cmd_queue == NULL || state_queue == NULL)
     {
         return ERR_SYS;
     }
@@ -183,7 +183,7 @@ static void Haier_Task(void *arg)
                                        .fan_speed = rx_buff[25],
                                        .temp_set  = 16 + rx_buff[35]};
 
-                TeleBot_SetState(state);
+                xQueueSend(state_queue, &state, 10 / portTICK_PERIOD_MS);
             }
         }
     }
@@ -196,6 +196,16 @@ uint32_t Haier_Cmd(uint8_t c)
     };
 
     if (xQueueSend(cmd_queue, &cmd, 10) == pdTRUE)
+    {
+        return ERR_OK;
+    }
+
+    return ERR_SYS;
+}
+
+uint32_t Haier_GetState(state_queue_t *state, TickType_t timeout)
+{
+    if (xQueueReceive(state_queue, state, timeout) == pdTRUE)
     {
         return ERR_OK;
     }

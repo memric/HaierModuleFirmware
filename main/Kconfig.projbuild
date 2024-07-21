@@ -17,4 +17,10 @@ config TG_BOT_TOKEN
     default "token"
     help
 	Telegram Bot Token.
+
+config TG_CHAT_ID
+    int "Telegram chat ID"
+    default 1
+    help
+        Accepted chat ID
 endmenu
