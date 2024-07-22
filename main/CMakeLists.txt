@@ -5,6 +5,8 @@ set(COMPONENT_PRIV_REQUIRES )
 set(COMPONENT_SRCS "main.c" 
 "telegram_bot.c"
 "haier.c"
+"ota.c"
+"FWTP/fwtp.c"
 "cJSON/cJSON.h")
 set(COMPONENT_ADD_INCLUDEDIRS "")
 set(COMPONENT_EMBED_TXTFILES "telegram_cert.pem")

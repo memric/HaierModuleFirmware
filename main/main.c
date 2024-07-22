@@ -8,6 +8,7 @@
 #include "esp_log.h"
 #include "telegram_bot.h"
 #include "haier.h"
+#include "ota.h"
 
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
@@ -68,7 +69,7 @@ void app_main(void)
 	/* Init Haier interface */
 	Haier_Init();
 
-	/*Create reconnect timer*/
+	/* Create reconnect timer */
     reconnTimer = xTimerCreate("Reconnect",
                                60 * 1000 / portTICK_PERIOD_MS,
                                pdFALSE, 0,
@@ -97,7 +98,6 @@ void app_main(void)
 			NULL,
 			&instance_got_ip));
 
-//    ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     wifi_config_t sta_config = {
         .sta = {
@@ -108,7 +108,6 @@ void app_main(void)
     };
     ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, &sta_config) );
     ESP_ERROR_CHECK( esp_wifi_start() );
-//    ESP_ERROR_CHECK( esp_wifi_connect() );
 
     gpio_config_t io_conf = {};
     io_conf.intr_type = GPIO_INTR_DISABLE;
@@ -119,10 +118,16 @@ void app_main(void)
     gpio_config(&io_conf);
     gpio_set_level(LED_PIN, 1);
 
+    /* Start OTA task */
+    if (OTA_init() != 0)
+    {
+        ESP_LOGE(TAG, "OTA initialization error");
+    }
+
     int level = 0;
     while (true) {
 
-    	/*Check WiFi events*/
+    	/* Check WiFi events */
     	if (s_wifi_event_group)
     	{
     		EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
@@ -137,7 +142,7 @@ void app_main(void)
     		{
     			ESP_LOGI(TAG, "Connected to AP SSID:%s", CONFIG_ESP_WIFI_SSID);
 
-    			/*Start Telegram bot*/
+    			/* Start Telegram bot */
     			TeleBot_Init();
     		}
     		else if (bits & WIFI_FAIL_BIT)

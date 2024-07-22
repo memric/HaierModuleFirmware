@@ -9,10 +9,6 @@
 #define CONFIG_HAIER_UART_PORT UART_NUM_1
 #endif
 
-// #ifndef CONFIG_SIM65M_TASK_STACK_SIZE
-// #define CONFIG_SIM65M_TASK_STACK_SIZE       (4 * 1024)
-// #endif
-
 /*
 I (11358) HAIER: On cmd
 I (11578) HAIER: Read 37 bytes: '��"'
