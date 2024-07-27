@@ -121,7 +121,7 @@ static void print_sha256(const uint8_t *image_hash, const char *label)
  * @param p
  * @return
  */
-uint32_t FWTPBlockWrite(uint8_t file_id, uint32_t ttl_fsize, uint32_t offset, uint16_t len, uint8_t *p)
+uint32_t FWTP_BlockWrite(uint8_t file_id, uint32_t ttl_fsize, uint32_t offset, uint16_t len, uint8_t *p)
 {
     if (file_id != FWTP_MAINSYSTEM_FILE_ID)
         return 0;
@@ -148,7 +148,7 @@ uint32_t FWTPBlockWrite(uint8_t file_id, uint32_t ttl_fsize, uint32_t offset, ui
  * @param ttl_fsize
  * @return
  */
-uint32_t FWTPFileStart(uint8_t file_id, uint32_t ttl_fsize)
+uint32_t FWTP_FileStart(uint8_t file_id, uint32_t ttl_fsize)
 {
     if (file_id != FWTP_MAINSYSTEM_FILE_ID)
         return 0;
@@ -169,29 +169,7 @@ uint32_t FWTPFileStart(uint8_t file_id, uint32_t ttl_fsize)
     }
     else
     {
-        /*ROM Bootloader is not supported on this STM32 UART pins*/
-#if 0
-		if (file_id == FWTP_SUBSYSTEM1_FILE_ID)
-		{
-#if CONFIG_SHC_HW_VERSION_M6
-			stm32_stop();
-			ESP_LOGI(TAG, "STM32 flashing initializing");
-			if (stm32_bootloader_init() == STM32_TASK_OK)
-			{
-
-			}
-			else
-			{
-				ESP_LOGE(TAG, "STM32 Bootloader initialization error");
-				return FWTP_ERR_SUBSYSTEM;
-			}
-#else
-			return FWTP_ERR_FILE_ID;
-#endif
-		}
-#else
         return FWTP_ERR_FILE_ID;
-#endif
     }
 
     return FWTP_ERR_OK;
@@ -202,7 +180,7 @@ uint32_t FWTPFileStart(uint8_t file_id, uint32_t ttl_fsize)
  * @param file_id
  * @return
  */
-uint32_t FWTPFileStop(uint8_t file_id)
+uint32_t FWTP_FileStop(uint8_t file_id)
 {
     if (file_id != FWTP_MAINSYSTEM_FILE_ID)
         return 0;

@@ -18,6 +18,7 @@ typedef struct
     uint8_t temp_set;  /*!< Set temperature */
     uint8_t mode;
     uint8_t fan_speed;
+    uint8_t en; /*!< Enabled */
 } state_queue_t;
 
 uint32_t Haier_Init(void);

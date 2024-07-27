@@ -6,3 +6,5 @@ sdkconfig
 .vscode/settings.json
 Haier/.devcontainer
 Haier/.vscode
+CMakeFiles
+CMakeCache.txt

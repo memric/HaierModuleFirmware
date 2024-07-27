@@ -91,12 +91,6 @@ uint32_t Haier_Init(void)
         return ERR_DRV;
     }
 
-    // /* Set pattern interrupt, used to detect the end of a line */
-    // uart_enable_pattern_det_baud_intr(CONFIG_HAIER_UART_PORT, '\n', 1, 9, 0, 0);
-    // /* Set pattern queue size */
-    // uart_pattern_queue_reset(CONFIG_HAIER_UART_PORT, UART_EVENT_QUEUE_SIZE);
-    // uart_flush(CONFIG_HAIER_UART_PORT);
-
     cmd_queue   = xQueueCreate(5, sizeof(cmd_queue_t));
     state_queue = xQueueCreate(5, sizeof(state_queue_t));
 
@@ -174,7 +168,8 @@ static void Haier_Task(void *arg)
 
             if (rx_buff[0] == 0xFF && rx_buff[2] == 0x22)
             {
-                state_queue_t state = {.temp_curr = rx_buff[13],
+                state_queue_t state = {.en        = rx_buff[29],
+                                       .temp_curr = rx_buff[13],
                                        .mode      = rx_buff[23],
                                        .fan_speed = rx_buff[25],
                                        .temp_set  = 16 + rx_buff[35]};
@@ -191,7 +186,7 @@ uint32_t Haier_Cmd(uint8_t c)
         .cmd = c,
     };
 
-    if (xQueueSend(cmd_queue, &cmd, 10) == pdTRUE)
+    if (xQueueSend(cmd_queue, &cmd, 10 / portTICK_PERIOD_MS) == pdTRUE)
     {
         return ERR_OK;
     }

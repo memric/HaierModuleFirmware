@@ -39,6 +39,8 @@
 #define CONFIG_TG_CHAT_ID 1
 #endif
 
+#define STR_APPEND(msg...) resp_len += snprintf(&resp_msg[resp_len], sizeof(resp_msg) - resp_len, msg)
+
 static const char *TAG           = "TELEGRAM";
 static TaskHandle_t telebot_task = NULL;
 
@@ -434,9 +436,57 @@ static void TeleBot_Task(void *arg)
 
         if (Haier_GetState(&haier_state, 10 / portTICK_PERIOD_MS) == 0)
         {
-            int resp_len =
-                snprintf(resp_msg, sizeof(resp_msg), "Temp: %i; Set temp: %i; Mode: %i; Fan: %i", haier_state.temp_curr,
-                         haier_state.temp_set, haier_state.mode, haier_state.fan_speed);
+            int resp_len = 0;
+
+            STR_APPEND("🔌: ");
+            if (haier_state.en)
+            {
+                STR_APPEND("ON");
+            }
+            else
+            {
+                STR_APPEND("OFF");
+            }
+            STR_APPEND("\n🌡️: %i°C; Set: %i°C", haier_state.temp_curr, haier_state.temp_set);
+            STR_APPEND("\n⚙️: ");
+            switch (haier_state.mode)
+            {
+            case 0:
+                STR_APPEND("Smart");
+                break;
+            case 1:
+                STR_APPEND("Cool");
+                break;
+            case 2:
+                STR_APPEND("Heat");
+                break;
+            case 3:
+                STR_APPEND("Vent");
+                break;
+            case 4:
+                STR_APPEND("Dry");
+                break;
+            default:
+                STR_APPEND("Unknown: %i", haier_state.mode);
+            }
+            STR_APPEND("\n💨: ");
+            switch (haier_state.fan_speed)
+            {
+            case 0:
+                STR_APPEND("Max");
+                break;
+            case 1:
+                STR_APPEND("Mid");
+                break;
+            case 2:
+                STR_APPEND("Min");
+                break;
+            case 3:
+                STR_APPEND("Auto");
+                break;
+            default:
+                STR_APPEND("Unknown: %i", haier_state.fan_speed);
+            }
 
             if (resp_len > 0)
             {
