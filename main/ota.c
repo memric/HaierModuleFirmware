@@ -121,7 +121,7 @@ static void print_sha256(const uint8_t *image_hash, const char *label)
  * @param p
  * @return
  */
-uint32_t FWTP_BlockWrite(uint8_t file_id, uint32_t ttl_fsize, uint32_t offset, uint16_t len, uint8_t *p)
+uint32_t FWTP_BlockWrite(uint8_t file_id, uint32_t ttl_fsize, uint32_t offset, uint16_t len, const uint8_t *p)
 {
     if (file_id != FWTP_MAINSYSTEM_FILE_ID)
         return 0;

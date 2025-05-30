@@ -426,17 +426,12 @@ static void TeleBot_Task(void *arg)
 
     while (1)
     {
-        /*Get updates*/
+        /* Get updates */
         resp_len = TeleBot_GetUpdates(&id);
 
-        if (resp_len > 0 && id != -1)
+        if (Haier_GetState(&haier_state, 10 / portTICK_PERIOD_MS) == 0 && resp_len > 0 && id != -1)
         {
-            memset(resp, 0, resp_len);
-        }
-
-        if (Haier_GetState(&haier_state, 10 / portTICK_PERIOD_MS) == 0)
-        {
-            int resp_len = 0;
+            resp_len = 0;
 
             STR_APPEND("🔌: ");
             if (haier_state.en)
