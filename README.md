@@ -1,16 +1,18 @@
-ESP-IDF Telegram Bot
+Haier Module
 ====================
 
-Telegram bot project based on ESP-IDF. Simple echo bot implementation with markup test.
+Haier Air Conditioner [remote controller](https://github.com/memric/HaierModule) firmware.
 
-ESP32 Devboard can be used for this project.
+Based on the [ESP32 Telegram bot](https://github.com/memric/ESP32_Telegrambot) project.
+
+## Building
 
 ### Set up and configure the project
 
 * Install and setup ESP-IDF. Run project configuration:
 
 ```
-idf.py set-target esp32
+idf.py set-target esp32c3
 idf.py menuconfig
 ```
 
@@ -27,9 +29,10 @@ idf.py build
 ```
 
 ```
-idf.py -p PORT flash monitor
+idf.py -p PORT flash
 ```
 
-(To exit the serial monitor, type ``Ctrl-]``.)
-
-See the [Get Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html) for full steps to configure and use ESP-IDF to build projects.
+## Useful links and reference projects
+- [Haier WiFi project](https://github.com/instalator/Haier_WiFi)
+- [Управление кондиционером Haier на базе ESP8266](https://blog.instalator.ru/archives/433)
+- [Haier Protocol project](https://github.com/paveldn/HaierProtocol)
