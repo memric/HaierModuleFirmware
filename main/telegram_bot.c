@@ -392,7 +392,7 @@ static void TeleBot_Task(void *arg)
     (void) arg;
     int32_t id = -1;
     int32_t resp_len;
-    state_queue_t haier_state;
+    haier_state_t haier_state;
     char resp_msg[128];
 
     /*Create markup*/

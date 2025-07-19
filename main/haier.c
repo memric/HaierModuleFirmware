@@ -60,6 +60,63 @@ static uint8_t rx_buff[128];
 
 static void Haier_Task(void *arg);
 
+/**
+ * @brief Calculate Haier protocol checksum as sum of all bytes (except start 0xffff)
+ *
+ * @param data  data bytes to calc
+ * @param len   data size
+ * @return      Checksum value
+ */
+uint8_t Haier_ProtocolGetChecksum(const uint8_t *data, uint16_t len)
+{
+    uint8_t crc = 0x0;
+
+    while (len)
+    {
+        crc += *data++;
+        len--;
+    }
+
+    return crc;
+}
+
+uint32_t Haier_ProtocolParser(const uint8_t *data, uint16_t len, haier_state_t *state)
+{
+    const haier_hdr_t *header = (haier_hdr_t *) data;
+
+    if (header->start != 0xFFFF)
+    {
+        ESP_LOGE(TAG, "Start bytes are not 0xFFFF");
+        return HAIER_ERR_PARSING;
+    }
+
+    if (header->flags > 0)
+    {
+        ESP_LOGE(TAG, "Checksum is not supported");
+        return HAIER_ERR_PARSING;
+    }
+
+    if (data[len - 1] != Haier_ProtocolGetChecksum(&data[2], len - 2))
+    {
+        ESP_LOGE(TAG, "CRC is not correct");
+        return HAIER_ERR_PARSING;
+    }
+
+    if (header->len != len - 3) // Check length without start bytes and CRC byte
+    {
+        ESP_LOGE(TAG, "Frame length is not correct");
+        return HAIER_ERR_PARSING;
+    }
+
+    if (header->type != 0x02)
+    {
+        ESP_LOGE(TAG, "Not response");
+        return HAIER_ERR_PARSING;
+    }
+
+    return HAIER_ERR_OK;
+}
+
 uint32_t Haier_Init(void)
 {
     /* UART Configuration */
@@ -92,7 +149,7 @@ uint32_t Haier_Init(void)
     }
 
     cmd_queue   = xQueueCreate(5, sizeof(cmd_queue_t));
-    state_queue = xQueueCreate(5, sizeof(state_queue_t));
+    state_queue = xQueueCreate(5, sizeof(haier_state_t));
 
     if (cmd_queue == NULL || state_queue == NULL)
     {
@@ -168,7 +225,7 @@ static void Haier_Task(void *arg)
 
             if (rx_buff[0] == 0xFF && rx_buff[2] == 0x22)
             {
-                state_queue_t state = {.en        = rx_buff[29],
+                haier_state_t state = {.en        = rx_buff[29],
                                        .temp_curr = rx_buff[13],
                                        .mode      = rx_buff[23],
                                        .fan_speed = rx_buff[25],
@@ -194,7 +251,7 @@ uint32_t Haier_Cmd(uint8_t c)
     return ERR_SYS;
 }
 
-uint32_t Haier_GetState(state_queue_t *state, TickType_t timeout)
+uint32_t Haier_GetState(haier_state_t *state, TickType_t timeout)
 {
     if (xQueueReceive(state_queue, state, timeout) == pdTRUE)
     {
