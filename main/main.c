@@ -127,8 +127,10 @@ void app_main(void)
                     gpio_set_level(LED_PIN, 1);
                 }
 
+#if CONFIG_TG_EN
                 /* Start Telegram bot */
                 TeleBot_Init();
+#endif /* CONFIG_TG_EN */
             }
             else if (bits & WIFI_FAIL_BIT)
             {

@@ -1,26 +1,35 @@
-# put here your custom config value
-menu "Project Configuration"
-config ESP_WIFI_SSID
-    string "WiFi SSID"
-    default "myssid"
-    help
-	SSID (network name) for the example to connect to.
+menu "Controller Configuration"
 
-config ESP_WIFI_PASSWORD
-    string "WiFi Password"
-    default "mypassword"
-    help
-	WiFi password (WPA or WPA2) for the example to use.
-	
-config TG_BOT_TOKEN
-    string "Telegram Bot Token"
-    default "token"
-    help
-	Telegram Bot Token.
+    config ESP_WIFI_SSID
+        string "WiFi SSID"
+        default "myssid"
+        help
+        SSID (network name) for the example to connect to.
 
-config TG_CHAT_ID
-    int "Telegram chat ID"
-    default 1
-    help
-        Accepted chat ID
+    config ESP_WIFI_PASSWORD
+        string "WiFi Password"
+        default "mypassword"
+        help
+        WiFi password (WPA or WPA2) for the example to use.
+
+    menuconfig TG_EN
+        bool "Enable Telegram bot"
+        default y
+        help
+            Enable Tegeram bot functionality.
+
+        if TG_EN
+            config TG_BOT_TOKEN
+                string "Telegram Bot Token"
+                default "token"
+                help
+                Telegram Bot Token.
+
+            config TG_CHAT_ID
+                int "Telegram chat ID"
+                default 1
+                help
+                    Accepted chat ID
+
+        endif # TG_EN
 endmenu

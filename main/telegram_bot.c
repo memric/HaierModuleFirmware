@@ -24,7 +24,11 @@
 
 #define WEB_SERVER       "api.telegram.org"
 #define WEB_URL          "https://api.telegram.org/bot"
+#if CONFIG_TG_EN
 #define BOT_TOKEN        CONFIG_TG_BOT_TOKEN
+#else
+#define BOT_TOKEN       "TEST_TOKEN"
+#endif /* CONFIG_TG_EN */
 
 #define UPDATE_TIMEOUT   5
 
