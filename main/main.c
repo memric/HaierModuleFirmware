@@ -9,6 +9,7 @@
 #include "nvs_flash.h"
 #include "ota.h"
 #include "telegram_bot.h"
+#include "mqtt_service.h"
 
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
@@ -131,6 +132,14 @@ void app_main(void)
                 /* Start Telegram bot */
                 TeleBot_Init();
 #endif /* CONFIG_TG_EN */
+
+#if CONFIG_MQTT_EN
+                /* Start MQTT service */
+                if (MQTT_ServiceInit() != MQTT_SERVICE_OK)
+                {
+                    ESP_LOGE(TAG, "MQTT service initialization error");
+                }
+#endif /* CONFIG_MQTT_EN */
             }
             else if (bits & WIFI_FAIL_BIT)
             {
