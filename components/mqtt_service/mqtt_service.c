@@ -28,8 +28,8 @@
 #define CONFIG_MQTT_TOPIC "HaierModule"
 #endif
 
-#ifndef CONFIG_MQTT_BROKER_URI
-#define CONFIG_MQTT_BROKER_URI "127.0.0.1"
+#ifndef CONFIG_MQTT_BROKER_HOST
+#define CONFIG_MQTT_BROKER_HOST "127.0.0.1"
 #endif
 
 #ifndef CONFIG_MQTT_BROKER_PORT

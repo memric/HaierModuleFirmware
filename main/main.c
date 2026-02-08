@@ -10,6 +10,11 @@
 #include "ota.h"
 #include "telegram_bot.h"
 #include "mqtt_service.h"
+#include "esp_app_desc.h"
+#include <string.h>
+#if CONFIG_MQTT_EN
+#include "cJSON.h"
+#endif
 
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
@@ -26,6 +31,7 @@ static TimerHandle_t reconnTimer = NULL;
 static const char *TAG           = "MAIN";
 
 void reconnectTimerCallback(TimerHandle_t xTimer);
+int32_t SendSysInfo(void);
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -58,6 +64,8 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
 void app_main(void)
 {
+    TickType_t sys_info_tick = xTaskGetTickCount();
+
     /* Initialize NVS */
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
@@ -100,11 +108,11 @@ void app_main(void)
     gpio_config_t io_conf = {};
     io_conf.intr_type     = GPIO_INTR_DISABLE;
     io_conf.mode          = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask  = (1 << LED_PIN);
+    io_conf.pin_bit_mask  = (1ULL << LED_PIN);
     io_conf.pull_down_en  = 0;
     io_conf.pull_up_en    = 0;
     gpio_config(&io_conf);
-    gpio_set_level(LED_PIN, 0);
+    gpio_set_level(LED_PIN, 1);
 
     while (true)
     {
@@ -151,6 +159,13 @@ void app_main(void)
                 xTimerStart(reconnTimer, 0);
             }
         }
+
+        /* System information sending */
+        if (sys_info_tick + pdMS_TO_TICKS(1000) < xTaskGetTickCount())
+        {
+            SendSysInfo();
+            sys_info_tick = xTaskGetTickCount();
+        }
     }
 }
 
@@ -158,4 +173,39 @@ void reconnectTimerCallback(TimerHandle_t xTimer)
 {
     esp_wifi_connect();
     s_retry_num = 0;
+}
+
+/**
+ * @brief Sends JSON with system information
+ *
+ * @return int32_t
+ */
+int32_t SendSysInfo(void)
+{
+    int32_t retval = -1;
+
+#if CONFIG_MQTT_EN
+
+    /*Construct JSON method object*/
+    cJSON *message                 = cJSON_CreateObjectReference(NULL);
+
+    const esp_app_desc_t *app_desc = esp_app_get_description();
+    cJSON_AddStringToObject(message, "App ver", app_desc->version);
+    // cJSON_AddStringToObject(message, "IDF ver", esp_get_idf_version());
+    cJSON_AddNumberToObject(message, "Life time", (xTaskGetTickCount() * portTICK_PERIOD_MS) / 1000);
+    cJSON_AddNumberToObject(message, "Reset reason", esp_reset_reason());
+
+    char *msg_to_send = cJSON_PrintUnformatted(message);
+
+    MQTT_Send("sys", msg_to_send);
+
+    retval = strlen(msg_to_send);
+
+    free(msg_to_send);
+
+    cJSON_Delete(message);
+
+#endif /* CONFIG_MQTT_EN */
+
+    return retval;
 }
