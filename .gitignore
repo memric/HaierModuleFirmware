@@ -20,3 +20,5 @@ config.env
 flasher_args.json
 project_description.json
 test/.vscode
+managed_components
+dependencies.lock
