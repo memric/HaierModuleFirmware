@@ -6,7 +6,7 @@
  */
 
 #include "telegram_bot.h"
-#include "cJSON/cJSON.h"
+#include "cJSON.h"
 #include "esp_crt_bundle.h"
 #include "esp_log.h"
 #include "esp_tls.h"
