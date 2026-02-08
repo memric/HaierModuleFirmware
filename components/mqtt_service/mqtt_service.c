@@ -74,14 +74,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         msg_id = esp_mqtt_client_subscribe(client, topic_string, 0);
         ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
-
-        /*Send some system information*/
-        // esp_reset_reason_t res_reas = esp_reset_reason();
-        // const esp_app_desc_t *app_desc = esp_app_get_description();
-        
-        // char msg[128] = {0};
-        // sprintf(msg, "{\"reset\":%i,\"version\":\"%s\",\"idf\":\"%s\"}", res_reas, app_desc->version, esp_get_idf_version());
-        // MQTT_SysSend("", msg);
         break;
 
     case MQTT_EVENT_DISCONNECTED:
@@ -187,12 +179,12 @@ static void mqtt_data_received(char *topic, int tlen, char *data, int dlen)
 }
 
 /**
- * @brief System parameters sending
+ * @brief Message sending
  *
  * @param subt Subtopic
  * @param msg Message
  */
-void MQTT_SysSend(const char *subt, const char *msg)
+void MQTT_Send(const char *subt, const char *msg)
 {
     int msg_id;
     char topic_msg[128] = {0};
@@ -204,11 +196,11 @@ void MQTT_SysSend(const char *subt, const char *msg)
 
     if (strlen(subt) > 0)
     {
-        sprintf(topic_msg, "%s/sys/%s", CONFIG_MQTT_TOPIC, subt);
+        sprintf(topic_msg, "%s/%s", CONFIG_MQTT_TOPIC, subt);
     }
     else
     {
-        sprintf(topic_msg, "%s/sys", CONFIG_MQTT_TOPIC);
+        sprintf(topic_msg, "%s", CONFIG_MQTT_TOPIC);
     }
 
     msg_id = esp_mqtt_client_publish(mqtt_client, topic_msg, msg, strlen(msg), CONFIG_MQTT_QOS_LEVEL, 0);
@@ -218,6 +210,6 @@ void MQTT_SysSend(const char *subt, const char *msg)
     }
     else
     {
-        ESP_LOGI(TAG, "published, msg_id=%d: %s", msg_id, topic_msg);
+        ESP_LOGI(TAG, "published, msg_id=%d: %s %s", msg_id, topic_msg, msg);
     }
 }
