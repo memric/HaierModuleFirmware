@@ -6,10 +6,7 @@
 #include "mqtt_service.h"
 #include "esp_event.h"
 #include "esp_netif.h"
-#include "esp_ota_ops.h"
 #include "esp_system.h"
-#include "esp_wifi.h"
-#include "nvs_flash.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -48,12 +45,10 @@ static esp_mqtt_client_handle_t mqtt_client = NULL;
 static uint8_t mqtt_client_connected        = 0; /*connection flag*/
 char topic_string[128]                      = "";
 
-#if CONFIG_BROKER_CERTIFICATE_OVERRIDDEN == 1
-static const uint8_t mqtt_pem_start[]  = "-----BEGIN CERTIFICATE-----\n" CONFIG_BROKER_CERTIFICATE_OVERRIDE "\n-----END CERTIFICATE-----";
-#else
-extern const uint8_t mqtt_pem_start[]   asm("_binary_mqtt_cert_pem_start");
-#endif
-extern const uint8_t mqtt_pem_end[]   asm("_binary_mqtt_cert_pem_end");
+#if CONFIG_MQTT_TLS_EN
+extern const uint8_t mqtt_pem_start[] asm("_binary_mqtt_cert_pem_start");
+extern const uint8_t mqtt_pem_end[] asm("_binary_mqtt_cert_pem_end");
+#endif /* CONFIG_MQTT_TLS_EN */
 
 static void mqtt_data_received(char *topic, int tlen, char *data, int dlen);
 
@@ -81,12 +76,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 
         /*Send some system information*/
-        esp_reset_reason_t res_reas = esp_reset_reason();
-        const esp_app_desc_t *app_desc = esp_app_get_description();
+        // esp_reset_reason_t res_reas = esp_reset_reason();
+        // const esp_app_desc_t *app_desc = esp_app_get_description();
         
-        char msg[128] = {0};
-        sprintf(msg, "{\"reset\":%i,\"version\":\"%s\",\"idf\":\"%s\"}", res_reas, app_desc->version, esp_get_idf_version());
-        MQTT_SysSend("", msg);
+        // char msg[128] = {0};
+        // sprintf(msg, "{\"reset\":%i,\"version\":\"%s\",\"idf\":\"%s\"}", res_reas, app_desc->version, esp_get_idf_version());
+        // MQTT_SysSend("", msg);
         break;
 
     case MQTT_EVENT_DISCONNECTED:
