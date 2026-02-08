@@ -1,4 +1,4 @@
-﻿build
+build
 sdkconfig.old
 sdkconfig
 .vscode/settings.json
@@ -19,3 +19,4 @@ compile_commands.json
 config.env
 flasher_args.json
 project_description.json
+test/.vscode

@@ -33,6 +33,10 @@ I (28998) HAIER: 0x3fc95580   00 37 00 09 70                                    
 #define ERR_DRV               1
 #define ERR_SYS               2
 
+#define HAIER_CMD_STATE       0x01
+#define HAIER_CMD_ON          0x02
+#define HAIER_CMD_OFF         0x03
+
 #pragma pack(push, 1)
 typedef struct
 {
@@ -159,6 +163,37 @@ uint32_t Haier_Init(void)
     xTaskCreate(Haier_Task, "Haier", 1024 * 6, NULL, 3, &haier_task);
 
     return ERR_OK;
+}
+
+uint8_t Haier_PrepareRequest(uint8_t *data, const uint8_t cmd)
+{
+    uint8_t len = 0;
+
+    switch (cmd)
+    {
+    case HAIER_CMD_STATE:
+    case HAIER_CMD_ON:
+    case HAIER_CMD_OFF:
+        len = 10;
+        break;
+    default:
+        break;
+    }
+    data[0]  = 0xFF; // Header
+    data[1]  = 0xFF;
+    data[2]  = len; // Length
+    data[3]  = 0;
+    data[4]  = 0;
+    data[5]  = 0;
+    data[6]  = 0;
+    data[7]  = 0;
+    data[8]  = 0x01;
+    data[9]  = 0x01; /* Request */
+    data[10] = 0x4D; /* Request */
+    data[11] = cmd;  /* Command */
+    data[12] = Haier_ProtocolGetChecksum(&data[2], len - 2);
+
+    return len;
 }
 
 static void Haier_Task(void *arg)
