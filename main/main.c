@@ -19,10 +19,13 @@
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
  * - we failed to connect after the maximum amount of retries */
-#define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT      BIT1
+#define WIFI_CONNECTED_BIT  BIT0
+#define WIFI_FAIL_BIT       BIT1
 
-#define LED_PIN            GPIO_NUM_7
+#define LED_PIN             GPIO_NUM_7
+
+#define LED_ON()            gpio_set_level(LED_PIN, 1)
+#define LED_OFF()           gpio_set_level(LED_PIN, 0)
 
 /* FreeRTOS event group to signal when we are connected */
 static EventGroupHandle_t s_wifi_event_group;
@@ -112,7 +115,7 @@ void app_main(void)
     io_conf.pull_down_en  = 0;
     io_conf.pull_up_en    = 0;
     gpio_config(&io_conf);
-    gpio_set_level(LED_PIN, 1);
+    LED_OFF();
 
     while (true)
     {
@@ -127,13 +130,12 @@ void app_main(void)
             if (bits & WIFI_CONNECTED_BIT)
             {
                 ESP_LOGI(TAG, "Connected to AP SSID:%s", CONFIG_ESP_WIFI_SSID);
-                gpio_set_level(LED_PIN, 0);
+                LED_ON();
 
                 /* Start OTA task */
                 if (OTA_init() != 0)
                 {
                     ESP_LOGE(TAG, "OTA initialization error");
-                    gpio_set_level(LED_PIN, 1);
                 }
 
 #if CONFIG_TG_EN
@@ -154,14 +156,14 @@ void app_main(void)
                 ESP_LOGI(TAG, "Failed to connect to SSID:%s", CONFIG_ESP_WIFI_PASSWORD);
                 ESP_LOGI(TAG, "Will try to reconnect 1 min later");
 
-                gpio_set_level(LED_PIN, 1);
+                LED_OFF();
 
                 xTimerStart(reconnTimer, 0);
             }
         }
 
         /* System information sending */
-        if (sys_info_tick + pdMS_TO_TICKS(1000) < xTaskGetTickCount())
+        if (sys_info_tick + pdMS_TO_TICKS(1000) < xTaskGetTickCount()) // TODO add period to kconfig
         {
             SendSysInfo();
             sys_info_tick = xTaskGetTickCount();
@@ -190,10 +192,10 @@ int32_t SendSysInfo(void)
     cJSON *message                 = cJSON_CreateObjectReference(NULL);
 
     const esp_app_desc_t *app_desc = esp_app_get_description();
-    cJSON_AddStringToObject(message, "App ver", app_desc->version);
+    cJSON_AddStringToObject(message, "AppVer", app_desc->version);
     // cJSON_AddStringToObject(message, "IDF ver", esp_get_idf_version());
-    cJSON_AddNumberToObject(message, "Life time", (xTaskGetTickCount() * portTICK_PERIOD_MS) / 1000);
-    cJSON_AddNumberToObject(message, "Reset reason", esp_reset_reason());
+    cJSON_AddNumberToObject(message, "LifeTime", (xTaskGetTickCount() * portTICK_PERIOD_MS) / 1000);
+    cJSON_AddNumberToObject(message, "ResetReason", esp_reset_reason());
 
     char *msg_to_send = cJSON_PrintUnformatted(message);
 

@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
+#include <string.h>
 
 #ifndef CONFIG_HAIER_UART_PORT
 #define CONFIG_HAIER_UART_PORT UART_NUM_1
@@ -33,18 +34,16 @@ I (28998) HAIER: 0x3fc95580   00 37 00 09 70                                    
 #define ERR_DRV               1
 #define ERR_SYS               2
 
-#define HAIER_CMD_STATE       0x01
-#define HAIER_CMD_ON          0x02
-#define HAIER_CMD_OFF         0x03
-
 #pragma pack(push, 1)
 typedef struct
 {
-    uint16_t start;   /*!< Frame start 0xFFFF */
-    uint8_t len;      /*!< Frame len */
-    uint8_t flags;    /*!< Frame flags. Indicates CRC presence */
-    uint8_t dummy[5]; /*!< Dummy bytes */
-    uint8_t type;     /*!< Frame type. 1 - request, 2 response */
+    uint16_t start;      /*!< Frame start 0xFFFF */
+    uint8_t len;         /*!< Frame len */
+    uint8_t flags;       /*!< Frame flags. Indicates CRC presence */
+    uint8_t reserved[5]; /*!< Dummy bytes */
+    uint8_t type;        /*!< Frame type. 1 - request, 2 response */
+    uint8_t sub_cmd1;    /*!< Subcommand. 0x4D for request, 0x6D for response */
+    uint8_t sub_cmd2;    /*!< Subcommand. */
 } haier_hdr_t;
 #pragma pack(pop)
 
@@ -54,6 +53,12 @@ typedef struct
     uint16_t param;
 } cmd_queue_t;
 
+#if CONFIG_HAIER_EMULATE_DATA
+const uint8_t test_response[] = {0xff, 0xff, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x6d, 0x01, 0x00,
+                                 0x1a, 0x00, 0x00, 0x00, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x03,
+                                 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x37, 0x00, 0x09, 0x71};
+#endif /* CONFIG_HAIER_EMULATE_DATA */
+
 static const char *TAG           = "HAIER";
 static QueueHandle_t uart_queue  = NULL;
 static QueueHandle_t cmd_queue   = NULL;
@@ -62,7 +67,7 @@ static TaskHandle_t haier_task   = NULL;
 static uint8_t tx_buff[128]      = {0xFF, 0xFF, 0};
 static uint8_t rx_buff[128];
 
-static void Haier_Task(void *arg);
+static void MQTT_Task(void *arg);
 
 /**
  * @brief Calculate Haier protocol checksum as sum of all bytes (except start 0xffff)
@@ -84,6 +89,14 @@ uint8_t Haier_ProtocolGetChecksum(const uint8_t *data, uint16_t len)
     return crc;
 }
 
+/**
+ * @brief           Haier Rx data parser
+ *
+ * @param data      Pointer to data
+ * @param len       Data length
+ * @param state     Pointer to state structure to fill
+ * @return uint32_t Error code
+ */
 uint32_t Haier_ProtocolParser(const uint8_t *data, uint16_t len, haier_state_t *state)
 {
     const haier_hdr_t *header = (haier_hdr_t *) data;
@@ -100,7 +113,7 @@ uint32_t Haier_ProtocolParser(const uint8_t *data, uint16_t len, haier_state_t *
         return HAIER_ERR_PARSING;
     }
 
-    if (data[len - 1] != Haier_ProtocolGetChecksum(&data[2], len - 2))
+    if (data[len - 1] != Haier_ProtocolGetChecksum(&data[2], len - 2 - 1)) // Minus header and checksum
     {
         ESP_LOGE(TAG, "CRC is not correct");
         return HAIER_ERR_PARSING;
@@ -117,6 +130,18 @@ uint32_t Haier_ProtocolParser(const uint8_t *data, uint16_t len, haier_state_t *
         ESP_LOGE(TAG, "Not response");
         return HAIER_ERR_PARSING;
     }
+
+    // TODO check len
+    if (len < 36)
+    {
+        return HAIER_ERR_PARSING;
+    }
+
+    state->en        = data[29];
+    state->temp_curr = data[13];
+    state->mode      = data[23];
+    state->fan_speed = data[25];
+    state->temp_set  = 16U + data[35];
 
     return HAIER_ERR_OK;
 }
@@ -145,8 +170,10 @@ uint32_t Haier_Init(void)
         return ERR_DRV;
     }
 
-    if (uart_driver_install(CONFIG_HAIER_UART_PORT, CONFIG_HAIER_UART_BUFF_SIZE, CONFIG_HAIER_UART_BUFF_SIZE,
-                            UART_EVENT_QUEUE_SIZE, &uart_queue, 0) != ESP_OK)
+    if (uart_driver_install(
+            CONFIG_HAIER_UART_PORT, CONFIG_HAIER_UART_BUFF_SIZE, CONFIG_HAIER_UART_BUFF_SIZE, UART_EVENT_QUEUE_SIZE,
+            &uart_queue, 0
+        ) != ESP_OK)
     {
         ESP_LOGE(TAG, "install uart driver failed");
         return ERR_DRV;
@@ -160,7 +187,7 @@ uint32_t Haier_Init(void)
         return ERR_SYS;
     }
 
-    xTaskCreate(Haier_Task, "Haier", 1024 * 6, NULL, 3, &haier_task);
+    xTaskCreate(MQTT_Task, "Haier", 1024 * 6, NULL, 3, &haier_task);
 
     return ERR_OK;
 }
@@ -179,9 +206,9 @@ uint8_t Haier_PrepareRequest(uint8_t *data, const uint8_t cmd)
     default:
         break;
     }
-    data[0]  = 0xFF; // Header
-    data[1]  = 0xFF;
-    data[2]  = len; // Length
+    data[0]  = 0xFF; /* Header */
+    data[1]  = 0xFF; /* Header */
+    data[2]  = len;  /* Length without header */
     data[3]  = 0;
     data[4]  = 0;
     data[5]  = 0;
@@ -191,82 +218,69 @@ uint8_t Haier_PrepareRequest(uint8_t *data, const uint8_t cmd)
     data[9]  = 0x01; /* Request */
     data[10] = 0x4D; /* Request */
     data[11] = cmd;  /* Command */
-    data[12] = Haier_ProtocolGetChecksum(&data[2], len - 2);
+    data[12] = Haier_ProtocolGetChecksum(&data[2], len);
 
-    return len;
+    return len + 2 + 1; /* with header and checksum */
 }
 
-static void Haier_Task(void *arg)
+static void MQTT_Task(void *arg)
 {
     (void) arg;
 
     cmd_queue_t cmd;
-    uint32_t len = 0;
+    uint32_t req_len = 0;
+    int resp_len     = 0;
+#ifdef CONFIG_HAIER_POLL_TIMER
+    TickType_t last_poll_tick = xTaskGetTickCount();
+#endif /* CONFIG_HAIER_POLL_TIMER */
 
     while (1)
     {
-        if (xQueueReceive(cmd_queue, &cmd, 10 / portTICK_PERIOD_MS) == pdTRUE)
+        req_len = 0;
+
+        if (xQueueReceive(cmd_queue, &cmd, pdMS_TO_TICKS(10)) == pdTRUE)
         {
-            len = 0;
+            req_len = Haier_PrepareRequest(tx_buff, cmd.cmd);
 
-            switch (cmd.cmd)
-            {
-            case HAIER_ON:
-                ESP_LOGI(TAG, "On cmd");
-                tx_buff[2]  = 0x0A; /* Length */
-                tx_buff[8]  = 0x01;
-                tx_buff[9]  = 0x01; /* Request */
-                tx_buff[10] = 0x4D; /* Request */
-                tx_buff[11] = 0x02; /* ON */
-                tx_buff[12] = 0x5B; /* CRC */
-                len         = 13;
-                break;
-            case HAIER_OFF:
-                ESP_LOGI(TAG, "Off cmd");
-                tx_buff[2]  = 0x0A; /* Length */
-                tx_buff[8]  = 0x01;
-                tx_buff[9]  = 0x01; /* Request */
-                tx_buff[10] = 0x4D; /* Request */
-                tx_buff[11] = 0x03; /* OFF */
-                tx_buff[12] = 0x5C; /* CRC */
-                len         = 13;
-                break;
-            case HAIER_STATE:
-                ESP_LOGI(TAG, "State cmd");
-                tx_buff[2]  = 0x0A; /* Length */
-                tx_buff[8]  = 0x01;
-                tx_buff[9]  = 0x01; /* Request */
-                tx_buff[10] = 0x4D; /* Request */
-                tx_buff[11] = 0x01; /* State */
-                tx_buff[12] = 0x5A; /* CRC */
-                len         = 13;
-                break;
-            default:
-                break;
-            }
+            ESP_LOGI(TAG, "Command request %" PRIu32 " bytes", req_len);
 
-            if (len)
-            {
-                uart_write_bytes(CONFIG_HAIER_UART_PORT, tx_buff, len);
-            }
+            last_poll_tick = xTaskGetTickCount();
         }
-
-        const int rxBytes = uart_read_bytes(CONFIG_HAIER_UART_PORT, rx_buff, sizeof(rx_buff), 100 / portTICK_PERIOD_MS);
-        if (rxBytes > 0)
+#ifdef CONFIG_HAIER_POLL_TIMER
+        else if (xTaskGetTickCount() - last_poll_tick > pdMS_TO_TICKS(CONFIG_HAIER_POLL_TIMER))
         {
-            rx_buff[rxBytes] = 0;
-            ESP_LOGI(TAG, "Read %d bytes: '%s'", rxBytes, rx_buff);
-            ESP_LOG_BUFFER_HEXDUMP(TAG, rx_buff, rxBytes, ESP_LOG_INFO);
+            /* Poll state periodiccaly if no command was received */
+            req_len = Haier_PrepareRequest(tx_buff, HAIER_STATE);
 
-            if (rx_buff[0] == 0xFF && rx_buff[2] == 0x22)
+            ESP_LOGI(TAG, "State request %" PRIu32 " bytes", req_len);
+
+            last_poll_tick = xTaskGetTickCount();
+        }
+#endif /* CONFIG_HAIER_POLL_TIMER */
+
+        if (req_len)
+        {
+#if CONFIG_HAIER_EMULATE_DATA
+            resp_len = sizeof(test_response);
+            memcpy(rx_buff, test_response, resp_len);
+#else
+            uart_write_bytes(CONFIG_HAIER_UART_PORT, tx_buff, req_len);
+
+            ESP_LOG_BUFFER_HEXDUMP(TAG, tx_buff, req_len, ESP_LOG_INFO);
+
+            resp_len = uart_read_bytes(CONFIG_HAIER_UART_PORT, rx_buff, sizeof(rx_buff), pdMS_TO_TICKS(100));
+#endif /* CONFIG_HAIER_EMULATE_DATA */
+            if (resp_len > 0)
             {
-                haier_state_t state = {.en        = rx_buff[29],
-                                       .temp_curr = rx_buff[13],
-                                       .mode      = rx_buff[23],
-                                       .fan_speed = rx_buff[25],
-                                       .temp_set  = 16 + rx_buff[35]};
+                rx_buff[resp_len] = 0;
+                ESP_LOGI(TAG, "Read %d bytes.", resp_len);
+                ESP_LOG_BUFFER_HEXDUMP(TAG, rx_buff, resp_len, ESP_LOG_INFO);
 
-                xQueueSend(state_queue, &state, 10 / portTICK_PERIOD_MS);
+                haier_state_t state;
+                if (Haier_ProtocolParser(rx_buff, resp_len, &state) == HAIER_ERR_OK)
+                {
+                    xQueueSend(state_queue, &state, pdMS_TO_TICKS(10));
+                }
             }
         }
     }
@@ -278,7 +292,7 @@ uint32_t Haier_Cmd(uint8_t c)
         .cmd = c,
     };
 
-    if (xQueueSend(cmd_queue, &cmd, 10 / portTICK_PERIOD_MS) == pdTRUE)
+    if (xQueueSend(cmd_queue, &cmd, pdMS_TO_TICKS(10)) == pdTRUE)
     {
         return ERR_OK;
     }

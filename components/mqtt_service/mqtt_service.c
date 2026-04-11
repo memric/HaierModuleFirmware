@@ -21,7 +21,9 @@
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 
+#include "cJSON.h"
 #include "esp_log.h"
+#include "haier.h"
 #include "mqtt_client.h"
 
 #ifndef CONFIG_MQTT_TOPIC
@@ -40,10 +42,13 @@
 #define CONFIG_MQTT_QOS_LEVEL 0
 #endif
 
-static const char *TAG                      = "MQTT_SERVICE";
+#define MQTT_CHECK_STR(topic, check_str, len) strncmp(topic, check_str, len) == 0
+
+static const char *TAG                      = "MQTT";
 static esp_mqtt_client_handle_t mqtt_client = NULL;
 static uint8_t mqtt_client_connected        = 0; /*connection flag*/
 char topic_string[128]                      = "";
+static TaskHandle_t mqtt_task               = NULL;
 
 #if CONFIG_MQTT_TLS_EN
 extern const uint8_t mqtt_pem_start[] asm("_binary_mqtt_cert_pem_start");
@@ -51,12 +56,13 @@ extern const uint8_t mqtt_pem_end[] asm("_binary_mqtt_cert_pem_end");
 #endif /* CONFIG_MQTT_TLS_EN */
 
 static void mqtt_data_received(char *topic, int tlen, char *data, int dlen);
+static void MQTT_Task(void *arg);
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%" PRIi32, base, event_id);
 
-    esp_mqtt_event_handle_t event = event_data;
+    esp_mqtt_event_handle_t event   = event_data;
     esp_mqtt_client_handle_t client = event->client;
     int msg_id;
 
@@ -113,19 +119,16 @@ static void MQTT_AppStart(void)
     const esp_mqtt_client_config_t mqtt_cfg = {
         .broker =
             {
-                .address.hostname = CONFIG_MQTT_BROKER_HOST,
-                .address.port     = CONFIG_MQTT_BROKER_PORT,
+                     .address.hostname = CONFIG_MQTT_BROKER_HOST,
+                     .address.port     = CONFIG_MQTT_BROKER_PORT,
 #if CONFIG_MQTT_TLS_EN
-                .address.transport        = MQTT_TRANSPORT_OVER_SSL,
-                .verification.certificate = (const char *) mqtt_pem_start
+                     .address.transport        = MQTT_TRANSPORT_OVER_SSL,
+                     .verification.certificate = (const char *) mqtt_pem_start
 #endif /* CONFIG_MQTT_TLS_EN */
             },
 
 #if CONFIG_MQTT_AUTH_EN
-        .credentials = {
-            .username = CONFIG_MQTT_USER, 
-            .authentication.password = CONFIG_MQTT_PASSWORD
-        }
+        .credentials = {.username = CONFIG_MQTT_USER, .authentication.password = CONFIG_MQTT_PASSWORD}
 #endif  /* CONFIG_MQTT_AUTH_EN */
     };
 
@@ -151,30 +154,41 @@ uint32_t MQTT_ServiceInit(void)
 
     MQTT_AppStart();
 
+    xTaskCreate(MQTT_Task, "MQTT Task", 1024 * 4, NULL, 3, &mqtt_task);
+
     return MQTT_SERVICE_OK;
 }
 
 static void mqtt_data_received(char *topic, int tlen, char *data, int dlen)
 {
-    char *srch;
-
     if (dlen == 0 || dlen > 3)
     {
         return;
     }
 
-    /*Reboot request*/
-    srch = strstr(topic, "set/restart");
-    if (srch != NULL)
+    /* Reboot request */
+    if (MQTT_CHECK_STR(topic, "set/restart", tlen))
     {
         ESP_LOGI(TAG, "Restart command received");
         esp_restart();
         return;
     }
 
-    srch = strstr(topic, "set/");
-    if (srch != NULL)
+    /* Enable request */
+    if (MQTT_CHECK_STR(topic, "set/enable", tlen))
     {
+        if (MQTT_CHECK_STR(data, "on", dlen))
+        {
+            ESP_LOGI(TAG, "Enable request");
+            Haier_Cmd(HAIER_ON);
+        }
+        else if (MQTT_CHECK_STR(data, "off", dlen))
+        {
+            ESP_LOGI(TAG, "Disable request");
+            Haier_Cmd(HAIER_OFF);
+        }
+
+        return;
     }
 }
 
@@ -211,5 +225,94 @@ void MQTT_Send(const char *subt, const char *msg)
     else
     {
         ESP_LOGI(TAG, "published, msg_id=%d: %s %s", msg_id, topic_msg, msg);
+    }
+}
+
+static void MQTT_Task(void *arg)
+{
+    (void) arg;
+    haier_state_t haier_state;
+
+    while (1)
+    {
+        if (Haier_GetState(&haier_state, pdMS_TO_TICKS(10)) == 0)
+        {
+            /*Construct JSON method object*/
+            cJSON *message = cJSON_CreateObject();
+
+            if (message != NULL)
+            {
+                /* ON/OFF */
+                if (haier_state.en)
+                {
+                    cJSON_AddStringToObject(message, "Enabled", "on");
+                }
+                else
+                {
+                    cJSON_AddStringToObject(message, "Enabled", "off");
+                }
+
+                /* Temperatures */
+                cJSON_AddNumberToObject(message, "TempCurr", haier_state.temp_curr);
+                cJSON_AddNumberToObject(message, "TempSet", haier_state.temp_set);
+
+                /* Mode */
+#if CONFIG_MODE_AS_STRING
+                switch (haier_state.mode)
+                {
+                case 0:
+                    cJSON_AddStringToObject(message, "Mode", "smart");
+                    break;
+                case 1:
+                    cJSON_AddStringToObject(message, "Mode", "cool");
+                    break;
+                case 2:
+                    cJSON_AddStringToObject(message, "Mode", "heat");
+                    break;
+                case 3:
+                    cJSON_AddStringToObject(message, "Mode", "vent");
+                    break;
+                case 4:
+                    cJSON_AddStringToObject(message, "Mode", "dry");
+                    break;
+                default:
+                    cJSON_AddNumberToObject(message, "Mode", haier_state.mode);
+                }
+#else
+                cJSON_AddNumberToObject(message, "Mode", haier_state.mode);
+#endif /* CONFIG_MODE_AS_STRING */
+
+                /* Fan speed */
+#if CONFIG_FAN_SPEED_AS_STRING
+                switch (haier_state.fan_speed)
+                {
+                case 0:
+                    cJSON_AddStringToObject(message, "Fan", "max");
+                    break;
+                case 1:
+                    cJSON_AddStringToObject(message, "Fan", "mid");
+                    break;
+                case 2:
+                    cJSON_AddStringToObject(message, "Fan", "min");
+                    break;
+                case 3:
+                    cJSON_AddStringToObject(message, "Fan", "auto");
+                    break;
+                default:
+                    cJSON_AddNumberToObject(message, "Fan", haier_state.fan_speed);
+                }
+#else
+                cJSON_AddNumberToObject(message, "Fan", haier_state.fan_speed);
+#endif /* CONFIG_FAN_SPEED_AS_STRING */
+
+                char *json_str = cJSON_PrintUnformatted(message);
+
+                /* Send state topic */
+                MQTT_Send("state", json_str);
+
+                vPortFree(json_str);
+                cJSON_Delete(message);
+            }
+        }
     }
 }

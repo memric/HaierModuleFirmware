@@ -1,10 +1,14 @@
-#include "unity.h"
 #include "haier.h"
+#include "unity.h"
 
 const uint8_t state_request[] = {0xFF, 0xFF, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x4D, 0x01, 0x5A};
+const uint8_t test_response[] = {0xFF, 0xFF, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x6d, 0x01, 0x00,
+                                 0x1a, 0x00, 0x00, 0x00, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x03,
+                                 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x37, 0x00, 0x09, 0x71};
 
 extern uint8_t Haier_ProtocolGetChecksum(const uint8_t *data, uint16_t len);
 extern uint8_t Haier_PrepareRequest(uint8_t *data, const uint8_t cmd);
+extern uint32_t Haier_ProtocolParser(const uint8_t *data, uint16_t len, haier_state_t *state);
 
 TEST_CASE("Haier CRC", "[passed]")
 {
@@ -17,8 +21,16 @@ TEST_CASE("Haier Request", "[passed]")
 {
     uint8_t test_data[128] = {0};
 
-    const uint8_t len = Haier_PrepareRequest(test_data, 1U); // State request
+    const uint8_t len      = Haier_PrepareRequest(test_data, 1U); // State request
 
-    TEST_ASSERT_EQUAL(len, 10U);
+    TEST_ASSERT_EQUAL(len, 12U);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(state_request, test_data, len);
+}
+
+TEST_CASE("Haier Response", "[passed]")
+{
+    haier_state_t state;
+    uint32_t retval = Haier_ProtocolParser(test_response, sizeof(test_response), &state);
+
+    TEST_ASSERT_EQUAL(retval, 0U);
 }

@@ -4,14 +4,18 @@
 #include "freertos/FreeRTOS.h"
 #include <stdint.h>
 
-#define HAIER_ERR_OK    0
-#define HAIER_ERR_PARSING    1
+#define HAIER_ERR_OK      0
+#define HAIER_ERR_PARSING 1
+
+#define HAIER_CMD_STATE   0x01
+#define HAIER_CMD_ON      0x02
+#define HAIER_CMD_OFF     0x03
 
 typedef enum
 {
-    HAIER_OFF = 0,
-    HAIER_ON,
-    HAIER_STATE,
+    HAIER_STATE = HAIER_CMD_STATE,
+    HAIER_OFF   = HAIER_CMD_OFF,
+    HAIER_ON    = HAIER_CMD_ON,
     HAIER_TEMP,
 } cmd_t;
 
