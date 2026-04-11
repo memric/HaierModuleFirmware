@@ -55,7 +55,7 @@ extern const uint8_t mqtt_pem_start[] asm("_binary_mqtt_cert_pem_start");
 extern const uint8_t mqtt_pem_end[] asm("_binary_mqtt_cert_pem_end");
 #endif /* CONFIG_MQTT_TLS_EN */
 
-static void mqtt_data_received(char *topic, int tlen, char *data, int dlen);
+static void MQTT_DataReceived(char *topic, int tlen, char *data, int dlen);
 static void MQTT_Task(void *arg);
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
@@ -101,7 +101,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
     case MQTT_EVENT_DATA:
         ESP_LOGI(TAG, "TOPIC: %.*s\tDATA: %.*s", event->topic_len, event->topic, event->data_len, event->data);
-        mqtt_data_received(event->topic, event->topic_len, event->data, event->data_len);
+        MQTT_DataReceived(event->topic, event->topic_len, event->data, event->data_len);
         break;
 
     case MQTT_EVENT_ERROR:
@@ -159,7 +159,7 @@ uint32_t MQTT_ServiceInit(void)
     return MQTT_SERVICE_OK;
 }
 
-static void mqtt_data_received(char *topic, int tlen, char *data, int dlen)
+static void MQTT_DataReceived(char *topic, int tlen, char *data, int dlen)
 {
     if (dlen == 0 || dlen > 3)
     {
@@ -175,17 +175,17 @@ static void mqtt_data_received(char *topic, int tlen, char *data, int dlen)
     }
 
     /* Enable request */
-    if (MQTT_CHECK_STR(topic, "set/enable", tlen))
+    if (MQTT_CHECK_STR(topic, CONFIG_MQTT_TOPIC "/set/enable", tlen))
     {
-        if (MQTT_CHECK_STR(data, "on", dlen))
+        if (MQTT_CHECK_STR(data, "on", dlen) || MQTT_CHECK_STR(data, "1", dlen))
         {
             ESP_LOGI(TAG, "Enable request");
-            Haier_Cmd(HAIER_ON);
+            Haier_Cmd(HAIER_ON, 1);
         }
-        else if (MQTT_CHECK_STR(data, "off", dlen))
+        else if (MQTT_CHECK_STR(data, "off", dlen) || MQTT_CHECK_STR(data, "0", dlen))
         {
             ESP_LOGI(TAG, "Disable request");
-            Haier_Cmd(HAIER_OFF);
+            Haier_Cmd(HAIER_OFF, 0);
         }
 
         return;
@@ -243,6 +243,7 @@ static void MQTT_Task(void *arg)
             if (message != NULL)
             {
                 /* ON/OFF */
+#if CONFIG_ENABLED_AS_STRING
                 if (haier_state.en)
                 {
                     cJSON_AddStringToObject(message, "Enabled", "on");
@@ -251,6 +252,9 @@ static void MQTT_Task(void *arg)
                 {
                     cJSON_AddStringToObject(message, "Enabled", "off");
                 }
+#else
+                cJSON_AddNumberToObject(message, "Enabled", haier_state.en);
+#endif /* CONFIG_ENABLED_AS_STRING */
 
                 /* Temperatures */
                 cJSON_AddNumberToObject(message, "TempCurr", haier_state.temp_curr);

@@ -286,13 +286,14 @@ static void MQTT_Task(void *arg)
     }
 }
 
-uint32_t Haier_Cmd(uint8_t c)
+uint32_t Haier_Cmd(uint8_t cmd, uint8_t param)
 {
-    cmd_queue_t cmd = {
-        .cmd = c,
+    cmd_queue_t queue_val = {
+        .cmd = cmd,
+        .param = param
     };
 
-    if (xQueueSend(cmd_queue, &cmd, pdMS_TO_TICKS(10)) == pdTRUE)
+    if (xQueueSend(cmd_queue, &queue_val, pdMS_TO_TICKS(10)) == pdTRUE)
     {
         return ERR_OK;
     }

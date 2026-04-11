@@ -510,17 +510,17 @@ void TeleBot_MessageCallback(uint32_t chat_id, const char *msg)
 
     if (memcmp(msg, ON_BTN_STR, strlen(ON_BTN_STR)) == 0)
     {
-        Haier_Cmd(HAIER_ON);
+        Haier_Cmd(HAIER_ON, 1);
         TeleBot_SendMessage(chat_id, "ON command received", mainMarkup);
     }
     else if (memcmp(msg, OFF_BTN_STR, strlen(OFF_BTN_STR)) == 0)
     {
-        Haier_Cmd(HAIER_OFF);
+        Haier_Cmd(HAIER_OFF, 0);
         TeleBot_SendMessage(chat_id, "OFF command received", mainMarkup);
     }
     else if (memcmp(msg, STATE_BTN_STR, strlen(STATE_BTN_STR)) == 0)
     {
-        Haier_Cmd(HAIER_STATE);
+        Haier_Cmd(HAIER_STATE, 0);
         TeleBot_SendMessage(chat_id, "State command received", mainMarkup);
     }
     else

@@ -17,19 +17,21 @@ typedef enum
     HAIER_OFF   = HAIER_CMD_OFF,
     HAIER_ON    = HAIER_CMD_ON,
     HAIER_TEMP,
+    HAIER_MODE,
+    HAIER_FAN,
 } cmd_t;
 
 typedef struct
 {
     uint8_t temp_curr; /*!< Current temp */
     uint8_t temp_set;  /*!< Set temperature */
-    uint8_t mode;
-    uint8_t fan_speed;
-    uint8_t en; /*!< Enabled */
+    uint8_t mode;      /*!< Mode: Dry/Heat/Cool*/
+    uint8_t fan_speed; /*!< Fan speed mode*/
+    uint8_t en;        /*!< Enabled */
 } haier_state_t;
 
 uint32_t Haier_Init(void);
-uint32_t Haier_Cmd(uint8_t c);
+uint32_t Haier_Cmd(uint8_t cmd, uint8_t param);
 uint32_t Haier_GetState(haier_state_t *state, TickType_t timeout);
 
 #endif /*HAIER_H_*/
