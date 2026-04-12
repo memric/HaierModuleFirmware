@@ -14,8 +14,8 @@
 typedef enum
 {
     HAIER_STATE = HAIER_CMD_STATE,
-    HAIER_OFF   = HAIER_CMD_OFF,
     HAIER_ON    = HAIER_CMD_ON,
+    HAIER_OFF   = HAIER_CMD_OFF,
     HAIER_TEMP,
     HAIER_MODE,
     HAIER_FAN,

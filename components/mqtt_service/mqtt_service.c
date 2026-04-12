@@ -161,10 +161,16 @@ uint32_t MQTT_ServiceInit(void)
 
 static void MQTT_DataReceived(char *topic, int tlen, char *data, int dlen)
 {
+    int value = 0;
+    char value_str[4];
+
     if (dlen == 0 || dlen > 3)
     {
         return;
     }
+
+    memcpy(value_str, data, dlen);
+    value_str[dlen] = '\0';
 
     /* Reboot request */
     if (MQTT_CHECK_STR(topic, "set/restart", tlen))
@@ -177,18 +183,43 @@ static void MQTT_DataReceived(char *topic, int tlen, char *data, int dlen)
     /* Enable request */
     if (MQTT_CHECK_STR(topic, CONFIG_MQTT_TOPIC "/set/enable", tlen))
     {
-        if (MQTT_CHECK_STR(data, "on", dlen) || MQTT_CHECK_STR(data, "1", dlen))
+        if (MQTT_CHECK_STR(value_str, "on", dlen) || MQTT_CHECK_STR(value_str, "1", dlen))
         {
             ESP_LOGI(TAG, "Enable request");
             Haier_Cmd(HAIER_ON, 1);
         }
-        else if (MQTT_CHECK_STR(data, "off", dlen) || MQTT_CHECK_STR(data, "0", dlen))
+        else if (MQTT_CHECK_STR(value_str, "off", dlen) || MQTT_CHECK_STR(value_str, "0", dlen))
         {
             ESP_LOGI(TAG, "Disable request");
             Haier_Cmd(HAIER_OFF, 0);
         }
-
-        return;
+    }
+    else if (MQTT_CHECK_STR(topic, CONFIG_MQTT_TOPIC "/set/temp", tlen))
+    {
+        value = atoi(value_str);
+        ESP_LOGI(TAG, "Temperature request. Value %d", value);
+        if (value >= 16 && value < 30) // TODO
+        {
+            Haier_Cmd(HAIER_TEMP, (uint8_t) value);
+        }
+    }
+    else if (MQTT_CHECK_STR(topic, CONFIG_MQTT_TOPIC "/set/mode", tlen))
+    {
+        value = atoi(value_str);
+        ESP_LOGI(TAG, "Mode request. Value %d", value);
+        if (value < 5) // TODO
+        {
+            Haier_Cmd(HAIER_MODE, (uint8_t) value);
+        }
+    }
+    else if (MQTT_CHECK_STR(topic, CONFIG_MQTT_TOPIC "/set/fan", tlen))
+    {
+        value = atoi(value_str);
+        ESP_LOGI(TAG, "Fan request. Value %d", value);
+        if (value < 4) // TODO
+        {
+            Haier_Cmd(HAIER_FAN, (uint8_t) value);
+        }
     }
 }
 

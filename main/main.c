@@ -67,7 +67,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
 void app_main(void)
 {
+#if CONFIG_SYS_SENDING_PERIOD
     TickType_t sys_info_tick = xTaskGetTickCount();
+#endif /* CONFIG_SYS_SENDING_PERIOD */
 
     /* Initialize NVS */
     esp_err_t ret = nvs_flash_init();
@@ -162,12 +164,14 @@ void app_main(void)
             }
         }
 
+#if CONFIG_SYS_SENDING_PERIOD
         /* System information sending */
-        if (sys_info_tick + pdMS_TO_TICKS(1000) < xTaskGetTickCount()) // TODO add period to kconfig
+        if (sys_info_tick + pdMS_TO_TICKS(CONFIG_SYS_SENDING_PERIOD) < xTaskGetTickCount()) // TODO add period to kconfig
         {
             SendSysInfo();
             sys_info_tick = xTaskGetTickCount();
         }
+#endif /* CONFIG_SYS_SENDING_PERIOD */
     }
 }
 
