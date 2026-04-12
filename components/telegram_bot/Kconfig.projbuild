@@ -1,0 +1,22 @@
+menu "Telegram bot Configuration"
+    menuconfig TG_EN
+        bool "Enable Telegram bot"
+        default y
+        help
+            Enable Tegeram bot functionality.
+
+        if TG_EN
+            config TG_BOT_TOKEN
+                string "Telegram Bot Token"
+                default "token"
+                help
+                Telegram Bot Token.
+
+            config TG_CHAT_ID
+                int "Telegram chat ID"
+                default 1
+                help
+                    Accepted chat ID
+
+        endif # TG_EN
+endmenu
