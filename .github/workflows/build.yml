@@ -6,7 +6,7 @@ jobs:
   build:
     strategy:
       matrix:
-        idf_ver: ["v5.3", "v5.5"]
+        idf_ver: ["v5.5", "v6.0"]
         idf_target: ["esp32c3"]
     runs-on: ubuntu-22.04
     container: espressif/idf:${{ matrix.idf_ver }}
