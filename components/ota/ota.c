@@ -6,11 +6,8 @@
  */
 
 #include "FWTP/fwtp.h"
-#include "driver/gpio.h"
 #include "errno.h"
-#include "esp_event.h"
 #include "esp_flash_partitions.h"
-#include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_partition.h"
@@ -22,9 +19,6 @@
 #include "nvs_flash.h"
 #include <stdint.h>
 #include <string.h>
-#if CONFIG_SHC_HW_VERSION_M6
-#include "stm32_task.h"
-#endif
 
 #define HASH_LEN 32 /* SHA-256 digest length */
 
@@ -65,13 +59,18 @@ uint32_t OTA_init(void)
 
     if (configured != running)
     {
-        ESP_LOGW(TAG, "Configured OTA boot partition at offset 0x%08" PRIx32 ", but running from offset 0x%08" PRIx32,
-                 configured->address, running->address);
-        ESP_LOGW(TAG,
-                 "(This can happen if either the OTA boot data or preferred boot image become corrupted somehow.)");
+        ESP_LOGW(
+            TAG, "Configured OTA boot partition at offset 0x%08" PRIx32 ", but running from offset 0x%08" PRIx32,
+            configured->address, running->address
+        );
+        ESP_LOGW(
+            TAG, "(This can happen if either the OTA boot data or preferred boot image become corrupted somehow.)"
+        );
     }
-    ESP_LOGI(TAG, "Running partition type %d subtype %d (offset 0x%08" PRIx32 ")", running->type, running->subtype,
-             running->address);
+    ESP_LOGI(
+        TAG, "Running partition type %d subtype %d (offset 0x%08" PRIx32 ")", running->type, running->subtype,
+        running->address
+    );
 
     esp_ota_img_states_t ota_state;
     if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK)
@@ -92,8 +91,10 @@ uint32_t OTA_init(void)
 
     update_partition = esp_ota_get_next_update_partition(NULL);
     assert(update_partition != NULL);
-    ESP_LOGI(TAG, "Writing to partition subtype %d at offset 0x%" PRIx32, update_partition->subtype,
-             update_partition->address);
+    ESP_LOGI(
+        TAG, "Writing to partition subtype %d at offset 0x%" PRIx32, update_partition->subtype,
+        update_partition->address
+    );
 
     /*Starting FWTP as s base transfer protocol*/
     FWTP_Init();
@@ -124,7 +125,9 @@ static void print_sha256(const uint8_t *image_hash, const char *label)
 uint32_t FWTP_BlockWrite(uint8_t file_id, uint32_t ttl_fsize, uint32_t offset, uint16_t len, const uint8_t *p)
 {
     if (file_id != FWTP_MAINSYSTEM_FILE_ID)
+    {
         return 0;
+    }
 
     esp_err_t err;
 
@@ -151,7 +154,9 @@ uint32_t FWTP_BlockWrite(uint8_t file_id, uint32_t ttl_fsize, uint32_t offset, u
 uint32_t FWTP_FileStart(uint8_t file_id, uint32_t ttl_fsize)
 {
     if (file_id != FWTP_MAINSYSTEM_FILE_ID)
+    {
         return 0;
+    }
 
     esp_err_t err;
 
@@ -183,7 +188,9 @@ uint32_t FWTP_FileStart(uint8_t file_id, uint32_t ttl_fsize)
 uint32_t FWTP_FileStop(uint8_t file_id)
 {
     if (file_id != FWTP_MAINSYSTEM_FILE_ID)
+    {
         return 0;
+    }
 
     esp_err_t err;
 

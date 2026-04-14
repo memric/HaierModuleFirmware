@@ -13,8 +13,8 @@ menu "Controller Configuration"
         WiFi password (WPA or WPA2) for the example to use.
 
     config SYS_SENDING_PERIOD
-            int "System Information sending period, ms"
-            default 5000
-            help
-                System Information sending period, ms.
+        int "System Information sending period, ms"
+        default 5000
+        help
+            System Information sending period, ms.
 endmenu
