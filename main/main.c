@@ -155,10 +155,15 @@ void app_main(void)
             }
             else if (bits & WIFI_FAIL_BIT)
             {
-                ESP_LOGI(TAG, "Failed to connect to SSID:%s", CONFIG_ESP_WIFI_PASSWORD);
+                ESP_LOGI(TAG, "Failed to connect to SSID:%s", CONFIG_ESP_WIFI_SSID);
                 ESP_LOGI(TAG, "Will try to reconnect 1 min later");
 
                 LED_OFF();
+
+#if CONFIG_MQTT_EN
+                /* Start MQTT service */
+                MQTT_ServiceDeinit();
+#endif /* CONFIG_MQTT_EN */
 
                 xTimerStart(reconnTimer, 0);
             }

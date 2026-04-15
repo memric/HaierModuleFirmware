@@ -140,7 +140,7 @@ static void MQTT_AppStart(void)
 /**
  * @brief MQTT Initialization
  *
- * @return uint32_t
+ * @return uint32_t Error code
  */
 uint32_t MQTT_ServiceInit(void)
 {
@@ -155,6 +155,29 @@ uint32_t MQTT_ServiceInit(void)
     MQTT_AppStart();
 
     xTaskCreate(MQTT_Task, "MQTT Task", 1024 * 4, NULL, 3, &mqtt_task);
+
+    return MQTT_SERVICE_OK;
+}
+
+/**
+ * @brief MQTT Service Deinitialization
+ *
+ * @return uint32_t Error code
+ */
+uint32_t MQTT_ServiceDeinit(void)
+{
+    if (mqtt_client != NULL)
+    {
+        if (mqtt_task != NULL)
+        {
+            vTaskDelete(mqtt_task);
+            mqtt_task = NULL;
+        }
+
+        esp_mqtt_client_stop(mqtt_client);
+        esp_mqtt_client_destroy(mqtt_client);
+        mqtt_client = NULL;
+    }
 
     return MQTT_SERVICE_OK;
 }

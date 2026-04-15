@@ -10,6 +10,7 @@
 #define MQTT_SERVICE_ERR 1
 
 uint32_t MQTT_ServiceInit(void);
+uint32_t MQTT_ServiceDeinit(void);
 void MQTT_Send(const char *subt, const char *msg);
 
 #endif /* MQTT_SERVICE_H_ */
