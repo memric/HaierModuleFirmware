@@ -1,4 +1,8 @@
 #include "driver/gpio.h"
+#if CONFIG_SYS_TEMP_SENSOR_ENABLE
+#include "driver/temperature_sensor.h"
+#endif
+#include "esp_app_desc.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_system.h"
@@ -6,11 +10,11 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "haier.h"
+#include "mqtt_service.h"
 #include "nvs_flash.h"
 #include "ota.h"
 #include "telegram_bot.h"
-#include "mqtt_service.h"
-#include "esp_app_desc.h"
+#include <math.h>
 #include <string.h>
 #if CONFIG_MQTT_EN
 #include "cJSON.h"
@@ -19,13 +23,13 @@
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
  * - we failed to connect after the maximum amount of retries */
-#define WIFI_CONNECTED_BIT  BIT0
-#define WIFI_FAIL_BIT       BIT1
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT      BIT1
 
-#define LED_PIN             GPIO_NUM_7
+#define LED_PIN            GPIO_NUM_7
 
-#define LED_ON()            gpio_set_level(LED_PIN, 1)
-#define LED_OFF()           gpio_set_level(LED_PIN, 0)
+#define LED_ON()           gpio_set_level(LED_PIN, 1)
+#define LED_OFF()          gpio_set_level(LED_PIN, 0)
 
 /* FreeRTOS event group to signal when we are connected */
 static EventGroupHandle_t s_wifi_event_group;
@@ -33,8 +37,13 @@ static int s_retry_num           = 0;
 static TimerHandle_t reconnTimer = NULL;
 static const char *TAG           = "MAIN";
 
+typedef struct
+{
+    float temp;
+} sys_info_t;
+
 void reconnectTimerCallback(TimerHandle_t xTimer);
-int32_t SendSysInfo(void);
+int32_t SendSysInfo(sys_info_t *sys_info);
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -80,6 +89,15 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
+#if CONFIG_SYS_TEMP_SENSOR_ENABLE
+    temperature_sensor_handle_t temp_sensor        = NULL;
+    temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
+    ESP_ERROR_CHECK(temperature_sensor_install(&temp_sensor_config, &temp_sensor));
+
+    ESP_LOGI(TAG, "Enable temperature sensor");
+    ESP_ERROR_CHECK(temperature_sensor_enable(temp_sensor));
+#endif /* CONFIG_SYS_TEMP_SENSOR_ENABLE */
+
     /* Init Haier interface */
     Haier_Init();
 
@@ -99,9 +117,11 @@ void app_main(void)
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
     ESP_ERROR_CHECK(
-        esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, &instance_any_id));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL,
-                                                        &instance_got_ip));
+        esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, &instance_any_id)
+    );
+    ESP_ERROR_CHECK(
+        esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL, &instance_got_ip)
+    );
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     wifi_config_t sta_config = {
@@ -124,8 +144,9 @@ void app_main(void)
         /* Check WiFi events */
         if (s_wifi_event_group)
         {
-            EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdTRUE,
-                                                   pdFALSE, 300 / portTICK_PERIOD_MS);
+            EventBits_t bits = xEventGroupWaitBits(
+                s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdTRUE, pdFALSE, 300 / portTICK_PERIOD_MS
+            );
 
             /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
              * happened. */
@@ -171,9 +192,15 @@ void app_main(void)
 
 #if CONFIG_SYS_SENDING_PERIOD
         /* System information sending */
-        if (sys_info_tick + pdMS_TO_TICKS(CONFIG_SYS_SENDING_PERIOD) < xTaskGetTickCount()) // TODO add period to kconfig
+        if (sys_info_tick + pdMS_TO_TICKS(CONFIG_SYS_SENDING_PERIOD) <
+            xTaskGetTickCount()) // TODO add period to kconfig
         {
-            SendSysInfo();
+            sys_info_t sys_info = {.temp = -273.F};
+#if CONFIG_SYS_TEMP_SENSOR_ENABLE
+            ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_sensor, &sys_info.temp));
+#endif /* CONFIG_SYS_TEMP_SENSOR_ENABLE */
+
+            SendSysInfo(&sys_info);
             sys_info_tick = xTaskGetTickCount();
         }
 #endif /* CONFIG_SYS_SENDING_PERIOD */
@@ -191,7 +218,7 @@ void reconnectTimerCallback(TimerHandle_t xTimer)
  *
  * @return int32_t
  */
-int32_t SendSysInfo(void)
+int32_t SendSysInfo(sys_info_t *sys_info)
 {
     int32_t retval = -1;
 
@@ -202,9 +229,12 @@ int32_t SendSysInfo(void)
 
     const esp_app_desc_t *app_desc = esp_app_get_description();
     cJSON_AddStringToObject(message, "AppVer", app_desc->version);
-    // cJSON_AddStringToObject(message, "IDF ver", esp_get_idf_version());
-    cJSON_AddNumberToObject(message, "LifeTime", (xTaskGetTickCount() * portTICK_PERIOD_MS) / 1000);
+    cJSON_AddStringToObject(message, "IdfVer", esp_get_idf_version());
+    cJSON_AddNumberToObject(message, "LifeTime", pdTICKS_TO_MS(xTaskGetTickCount()) / 1000);
     cJSON_AddNumberToObject(message, "ResetReason", esp_reset_reason());
+#if CONFIG_SYS_TEMP_SENSOR_ENABLE
+    cJSON_AddNumberToObject(message, "Temp", roundf(sys_info->temp));
+#endif /* CONFIG_SYS_TEMP_SENSOR_ENABLE */
 
     char *msg_to_send = cJSON_PrintUnformatted(message);
 

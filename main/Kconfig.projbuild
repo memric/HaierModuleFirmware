@@ -17,4 +17,10 @@ menu "Controller Configuration"
         default 5000
         help
             System Information sending period, ms.
+
+    config SYS_TEMP_SENSOR_ENABLE
+        bool "Enable SoC temperature sensor"
+        default y
+        help
+            Enable SoC temperature sensor.
 endmenu
