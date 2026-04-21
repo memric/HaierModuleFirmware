@@ -167,7 +167,7 @@ void app_main(void)
                 connected = true;
 
                 /* Start OTA task */
-                if (OTA_init() != 0)
+                if (OTA_Init() != 0)
                 {
                     ESP_LOGE(TAG, "OTA initialization error");
                 }
@@ -197,7 +197,12 @@ void app_main(void)
                 MQTT_ServiceDeinit();
 #endif /* CONFIG_MQTT_EN */
 
-                xTimerStart(reconnTimer, 0);
+                if (OTA_Deinit() != 0)
+                {
+                    ESP_LOGE(TAG, "OTA deinitialization error");
+                }
+
+                xTimerStart(reconn_timer, 0);
             }
         }
 

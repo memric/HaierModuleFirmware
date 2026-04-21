@@ -31,7 +31,7 @@ TimerHandle_t reboot_timer;
 
 void RebootTimerCallback(TimerHandle_t xTimer);
 
-uint32_t OTA_init(void)
+uint32_t OTA_Init(void)
 {
     uint8_t sha_256[HASH_LEN] = {0};
     esp_partition_t partition;
@@ -98,6 +98,15 @@ uint32_t OTA_init(void)
 
     /*Starting FWTP as s base transfer protocol*/
     FWTP_Init();
+
+    return 0;
+}
+
+uint32_t OTA_Deinit(void)
+{
+    ESP_LOGI(TAG, "OTA deinitialization");
+
+    FWTP_Deinit();
 
     return 0;
 }
