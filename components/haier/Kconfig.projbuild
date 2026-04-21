@@ -1,20 +1,28 @@
 menu "Haier Interface Configuration"
-    config HAIER_EMULATE_DATA
-        bool "Enable Haier data emulation"
-        default n
-        help
-            Enable Haier data emulation.
-
-    menuconfig HAIER_POLL_ENABLE
-        bool "Enable Haier polling"
+    menuconfig HAIER_ENABLE
+        bool "Enable Haier protocol"
         default y
         help
-            Enable Haier polling.
+            Enable Haier protocol.
 
-        config HAIER_POLL_TIMER
-            int "Haier polling timer, ms"
-            default 5000
-            depends on HAIER_POLL_ENABLE
+        config HAIER_EMULATE_DATA
+            bool "Enable Haier data emulation"
+            default n
+            depends on HAIER_ENABLE
             help
-                Haier polling timer, ms.
+                Enable Haier data emulation.
+
+        menuconfig HAIER_POLL_ENABLE
+            bool "Enable Haier polling"
+            default y
+            depends on HAIER_ENABLE
+            help
+                Enable Haier polling.
+
+            config HAIER_POLL_TIMER
+                int "Haier polling timer, ms"
+                default 5000
+                depends on HAIER_POLL_ENABLE
+                help
+                    Haier polling timer, ms.
 endmenu

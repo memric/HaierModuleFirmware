@@ -292,10 +292,13 @@ uint32_t MQTT_Send(const char *subt, const char *msg)
 static void MQTT_Task(void *arg)
 {
     (void) arg;
+#if CONFIG_HAIER_ENABLE
     haier_state_t haier_state;
+#endif /* CONFIG_HAIER_ENABLE */
 
     while (1)
     {
+#if CONFIG_HAIER_ENABLE
         if (Haier_GetState(&haier_state, pdMS_TO_TICKS(10)) == 0)
         {
             /*Construct JSON method object*/
@@ -379,5 +382,8 @@ static void MQTT_Task(void *arg)
                 cJSON_Delete(message);
             }
         }
+#else
+        vTaskDelay(pdMS_TO_TICKS(1000));
+#endif /* CONFIG_HAIER_ENABLE */
     }
 }

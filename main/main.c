@@ -109,7 +109,9 @@ void app_main(void)
 #endif /* CONFIG_SYS_TEMP_SENSOR_ENABLE */
 
     /* Init Haier interface */
+#if CONFIG_HAIER_ENABLE
     Haier_Init();
+#endif /* CONFIG_HAIER_ENABLE */
 
     /* Create LED timer */
     led_timer    = xTimerCreate("LED", pdMS_TO_TICKS(10), pdFALSE, 0, LedTimerCallback);

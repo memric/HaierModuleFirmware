@@ -321,7 +321,9 @@ static void Haier_Task(void *arg)
             ESP_LOG_BUFFER_HEXDUMP(TAG, tx_buff, req_len, ESP_LOG_INFO);
 
             resp_len       = Haier_SendReceive(req_len);
+#ifdef CONFIG_HAIER_POLL_TIMER
             last_poll_tick = xTaskGetTickCount();
+#endif /* CONFIG_HAIER_POLL_TIMER */
 
             if (resp_len > 0)
             {
@@ -369,7 +371,7 @@ uint32_t Haier_Cmd(uint8_t cmd, uint8_t param)
 
 uint32_t Haier_GetState(haier_state_t *state, TickType_t timeout)
 {
-    if (xQueueReceive(state_queue, state, timeout) == pdTRUE)
+    if (state_queue != NULL && xQueueReceive(state_queue, state, timeout) == pdTRUE)
     {
         return ERR_OK;
     }
