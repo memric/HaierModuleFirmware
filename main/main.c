@@ -29,20 +29,27 @@
 #define LED_PIN            GPIO_NUM_7
 
 #define LED_ON()           gpio_set_level(LED_PIN, 1)
-#define LED_OFF()          gpio_set_level(LED_PIN, 0)
+#define LED_BLINK()                                                                                                    \
+    {                                                                                                                  \
+        LED_ON();                                                                                                      \
+        xTimerStart(led_timer, 0);                                                                                     \
+    }
+#define LED_OFF() gpio_set_level(LED_PIN, 0)
 
 /* FreeRTOS event group to signal when we are connected */
 static EventGroupHandle_t s_wifi_event_group;
-static int s_retry_num           = 0;
-static TimerHandle_t reconnTimer = NULL;
-static const char *TAG           = "MAIN";
+static int s_retry_num            = 0;
+static TimerHandle_t reconn_timer = NULL;
+static TimerHandle_t led_timer    = NULL;
+static const char *TAG            = "MAIN";
 
 typedef struct
 {
     float temp;
 } sys_info_t;
 
-void reconnectTimerCallback(TimerHandle_t xTimer);
+void ReconnectTimerCallback(TimerHandle_t xTimer);
+void LedTimerCallback(TimerHandle_t xTimer);
 int32_t SendSysInfo(sys_info_t *sys_info);
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -79,9 +86,10 @@ void app_main(void)
 #if CONFIG_SYS_SENDING_PERIOD
     TickType_t sys_info_tick = xTaskGetTickCount();
 #endif /* CONFIG_SYS_SENDING_PERIOD */
+    bool connected = false;
 
     /* Initialize NVS */
-    esp_err_t ret = nvs_flash_init();
+    esp_err_t ret  = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -101,12 +109,15 @@ void app_main(void)
     /* Init Haier interface */
     Haier_Init();
 
+    /* Create LED timer */
+    led_timer    = xTimerCreate("LED", pdMS_TO_TICKS(10), pdFALSE, 0, LedTimerCallback);
     /* Create reconnect timer */
-    reconnTimer = xTimerCreate("Reconnect", 60 * 1000 / portTICK_PERIOD_MS, pdFALSE, 0, reconnectTimerCallback);
+    reconn_timer = xTimerCreate("Reconnect", pdMS_TO_TICKS(60 * 1000), pdFALSE, 0, ReconnectTimerCallback);
 
     ESP_ERROR_CHECK(esp_netif_init());
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
+
     esp_netif_create_default_wifi_sta();
 
     s_wifi_event_group     = xEventGroupCreate();
@@ -145,7 +156,7 @@ void app_main(void)
         if (s_wifi_event_group)
         {
             EventBits_t bits = xEventGroupWaitBits(
-                s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdTRUE, pdFALSE, 300 / portTICK_PERIOD_MS
+                s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdTRUE, pdFALSE, pdMS_TO_TICKS(300)
             );
 
             /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
@@ -153,7 +164,7 @@ void app_main(void)
             if (bits & WIFI_CONNECTED_BIT)
             {
                 ESP_LOGI(TAG, "Connected to AP SSID:%s", CONFIG_ESP_WIFI_SSID);
-                LED_ON();
+                connected = true;
 
                 /* Start OTA task */
                 if (OTA_init() != 0)
@@ -179,7 +190,7 @@ void app_main(void)
                 ESP_LOGI(TAG, "Failed to connect to SSID:%s", CONFIG_ESP_WIFI_SSID);
                 ESP_LOGI(TAG, "Will try to reconnect 1 min later");
 
-                LED_OFF();
+                connected = false;
 
 #if CONFIG_MQTT_EN
                 /* Start MQTT service */
@@ -192,25 +203,33 @@ void app_main(void)
 
 #if CONFIG_SYS_SENDING_PERIOD
         /* System information sending */
-        if (sys_info_tick + pdMS_TO_TICKS(CONFIG_SYS_SENDING_PERIOD) <
-            xTaskGetTickCount()) // TODO add period to kconfig
+        if (connected && (sys_info_tick + pdMS_TO_TICKS(CONFIG_SYS_SENDING_PERIOD) < xTaskGetTickCount()))
         {
             sys_info_t sys_info = {.temp = -273.F};
 #if CONFIG_SYS_TEMP_SENSOR_ENABLE
             ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_sensor, &sys_info.temp));
 #endif /* CONFIG_SYS_TEMP_SENSOR_ENABLE */
 
-            SendSysInfo(&sys_info);
+            if (SendSysInfo(&sys_info) > 0)
+            {
+                LED_BLINK();
+            }
+
             sys_info_tick = xTaskGetTickCount();
         }
 #endif /* CONFIG_SYS_SENDING_PERIOD */
     }
 }
 
-void reconnectTimerCallback(TimerHandle_t xTimer)
+void ReconnectTimerCallback(TimerHandle_t xTimer)
 {
     esp_wifi_connect();
     s_retry_num = 0;
+}
+
+void LedTimerCallback(TimerHandle_t xTimer)
+{
+    LED_OFF();
 }
 
 /**
@@ -238,9 +257,10 @@ int32_t SendSysInfo(sys_info_t *sys_info)
 
     char *msg_to_send = cJSON_PrintUnformatted(message);
 
-    MQTT_Send("sys", msg_to_send);
-
-    retval = strlen(msg_to_send);
+    if (MQTT_Send("sys", msg_to_send) == MQTT_SERVICE_OK)
+    {
+        retval = strlen(msg_to_send);
+    }
 
     free(msg_to_send);
 

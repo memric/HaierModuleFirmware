@@ -251,15 +251,18 @@ static void MQTT_DataReceived(char *topic, int tlen, char *data, int dlen)
  *
  * @param subt Subtopic
  * @param msg Message
+ * 
+ * @return uint32_t Error code
  */
-void MQTT_Send(const char *subt, const char *msg)
+uint32_t MQTT_Send(const char *subt, const char *msg)
 {
     int msg_id;
     char topic_msg[128] = {0};
+    uint32_t retval = MQTT_SERVICE_ERR;
 
     if (!mqtt_client || !mqtt_client_connected)
     {
-        return;
+        return MQTT_SERVICE_ERR;
     }
 
     if (strlen(subt) > 0)
@@ -275,11 +278,15 @@ void MQTT_Send(const char *subt, const char *msg)
     if (msg_id < 0)
     {
         ESP_LOGW(TAG, "publish error");
+        retval = MQTT_SERVICE_ERR;
     }
     else
     {
         ESP_LOGI(TAG, "published, msg_id=%d: %s %s", msg_id, topic_msg, msg);
+        retval = MQTT_SERVICE_OK;
     }
+
+    return retval;
 }
 
 static void MQTT_Task(void *arg)
