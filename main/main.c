@@ -12,7 +12,9 @@
 #include "haier.h"
 #include "mqtt_service.h"
 #include "nvs_flash.h"
+#if CONFIG_SYS_OTA_ENABLE
 #include "ota.h"
+#endif /* CONFIG_SYS_OTA_ENABLE */
 #include "telegram_bot.h"
 #include <math.h>
 #include <string.h>
@@ -166,11 +168,13 @@ void app_main(void)
                 ESP_LOGI(TAG, "Connected to AP SSID:%s", CONFIG_ESP_WIFI_SSID);
                 connected = true;
 
+#if CONFIG_SYS_OTA_ENABLE
                 /* Start OTA task */
                 if (OTA_Init() != 0)
                 {
                     ESP_LOGE(TAG, "OTA initialization error");
                 }
+#endif /* CONFIG_SYS_OTA_ENABLE */
 
 #if CONFIG_TG_EN
                 /* Start Telegram bot */
@@ -197,10 +201,12 @@ void app_main(void)
                 MQTT_ServiceDeinit();
 #endif /* CONFIG_MQTT_EN */
 
+#if CONFIG_SYS_OTA_ENABLE
                 if (OTA_Deinit() != 0)
                 {
                     ESP_LOGE(TAG, "OTA deinitialization error");
                 }
+#endif /* CONFIG_SYS_OTA_ENABLE */
 
                 xTimerStart(reconn_timer, 0);
             }

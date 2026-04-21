@@ -23,4 +23,10 @@ menu "Controller Configuration"
         default y
         help
             Enable SoC temperature sensor.
+
+    config SYS_OTA_ENABLE
+        bool "Enable OTA thrue WiFi & FWTP"
+        default y
+        help
+            Enable OTA thrue WiFi & FWTP.
 endmenu
