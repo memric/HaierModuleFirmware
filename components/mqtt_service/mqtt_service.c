@@ -251,16 +251,21 @@ static void MQTT_DataReceived(char *topic, int tlen, char *data, int dlen)
  *
  * @param subt Subtopic
  * @param msg Message
- * 
+ *
  * @return uint32_t Error code
  */
 uint32_t MQTT_Send(const char *subt, const char *msg)
 {
     int msg_id;
     char topic_msg[128] = {0};
-    uint32_t retval = MQTT_SERVICE_ERR;
+    uint32_t retval     = MQTT_SERVICE_ERR;
 
     if (!mqtt_client || !mqtt_client_connected)
+    {
+        return MQTT_SERVICE_ERR;
+    }
+
+    if (strlen(msg) == 0)
     {
         return MQTT_SERVICE_ERR;
     }

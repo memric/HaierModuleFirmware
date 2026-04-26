@@ -10,6 +10,10 @@
 #define CONFIG_HAIER_UART_PORT UART_NUM_1
 #endif
 
+#ifndef CONFIG_HAIER_BUF_LEN
+#define CONFIG_HAIER_BUF_LEN    128
+#endif
+
 /*
 I (11358) HAIER: On cmd
 I (11578) HAIER: Read 37 bytes: '��"'
@@ -89,8 +93,8 @@ static QueueHandle_t uart_queue  = NULL;
 static QueueHandle_t cmd_queue   = NULL;
 static QueueHandle_t state_queue = NULL;
 static TaskHandle_t haier_task   = NULL;
-static uint8_t tx_buff[128];
-static uint8_t rx_buff[128];
+static uint8_t tx_buff[CONFIG_HAIER_BUF_LEN];
+static uint8_t rx_buff[CONFIG_HAIER_BUF_LEN];
 
 static int Haier_SendReceive(uint32_t req_len);
 static void Haier_Task(void *arg);
@@ -125,7 +129,7 @@ uint8_t Haier_ProtocolGetChecksum(const uint8_t *data, uint16_t len)
  */
 uint32_t Haier_ProtocolParser(const uint8_t *data, uint16_t len, haier_state_t *state)
 {
-    if (len < 36)
+    if (len < 36 || len > CONFIG_HAIER_BUF_LEN)
     {
         return HAIER_ERR_PARSING;
     }
@@ -210,7 +214,7 @@ uint32_t Haier_Init(void)
         return ERR_SYS;
     }
 
-    xTaskCreate(Haier_Task, "Haier", 1024 * 6, NULL, 3, &haier_task);
+    xTaskCreate(Haier_Task, "Haier", 1024 * 6, NULL, 5, &haier_task);
 
     return ERR_OK;
 }
@@ -280,7 +284,7 @@ static int Haier_SendReceive(uint32_t req_len)
         resp_len = sizeof(test_response);
         memcpy(rx_buff, test_response, resp_len);
 #else
-        uart_write_bytes(CONFIG_HAIER_UART_PORT, tx_buff, req_len);
+        uart_write_bytes(CONFIG_HAIER_UART_PORT, tx_buff, req_len); //TODO check len
         resp_len = uart_read_bytes(CONFIG_HAIER_UART_PORT, rx_buff, sizeof(rx_buff), pdMS_TO_TICKS(100));
 #endif /* CONFIG_HAIER_EMULATE_DATA */
     }

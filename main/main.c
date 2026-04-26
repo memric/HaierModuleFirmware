@@ -47,7 +47,11 @@ static const char *TAG            = "MAIN";
 
 typedef struct
 {
-    float temp;
+#if CONFIG_SYS_TEMP_SENSOR_ENABLE
+    float temp;           /*! SoC temperature */
+#endif                    /* CONFIG_SYS_TEMP_SENSOR_ENABLE */
+    uint32_t reconn_cntr; /*! Reconnect counter */
+    bool connected;       /*! Connected */
 } sys_info_t;
 
 void ReconnectTimerCallback(TimerHandle_t xTimer);
@@ -88,10 +92,10 @@ void app_main(void)
 #if CONFIG_SYS_SENDING_PERIOD
     TickType_t sys_info_tick = xTaskGetTickCount();
 #endif /* CONFIG_SYS_SENDING_PERIOD */
-    bool connected = false;
+    sys_info_t sys_info = {.temp = -273.F, .reconn_cntr = 0, .connected = false};
 
     /* Initialize NVS */
-    esp_err_t ret  = nvs_flash_init();
+    esp_err_t ret       = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -114,17 +118,17 @@ void app_main(void)
 #endif /* CONFIG_HAIER_ENABLE */
 
     /* Create LED timer */
-    led_timer    = xTimerCreate("LED", pdMS_TO_TICKS(10), pdFALSE, 0, LedTimerCallback);
+    led_timer          = xTimerCreate("LED", pdMS_TO_TICKS(10), pdFALSE, 0, LedTimerCallback);
     /* Create reconnect timer */
-    reconn_timer = xTimerCreate("Reconnect", pdMS_TO_TICKS(60 * 1000), pdFALSE, 0, ReconnectTimerCallback);
+    reconn_timer       = xTimerCreate("Reconnect", pdMS_TO_TICKS(60 * 1000), pdFALSE, 0, ReconnectTimerCallback);
+
+    s_wifi_event_group = xEventGroupCreate();
 
     ESP_ERROR_CHECK(esp_netif_init());
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     esp_netif_create_default_wifi_sta();
-
-    s_wifi_event_group     = xEventGroupCreate();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -138,11 +142,26 @@ void app_main(void)
         esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL, &instance_got_ip)
     );
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    wifi_config_t sta_config = {
-        .sta = {.ssid = CONFIG_ESP_WIFI_SSID, .password = CONFIG_ESP_WIFI_PASSWORD, .bssid_set = false}
+    wifi_config_t wifi_config = {
+        .sta = {
+                .ssid               = CONFIG_ESP_WIFI_SSID,
+                .password           = CONFIG_ESP_WIFI_PASSWORD,
+                /* Authmode threshold resets to WPA2 as default if password matches WPA2
+                * standards (password len => 8). If you want to connect the device to
+                * deprecated WEP/WPA networks, Please set the threshold value to
+                * WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format
+                * matching to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK standards.
+                */
+            .threshold.authmode = WIFI_AUTH_WPA2_PSK, // TODO to Kconfig
+    // .sae_pwe_h2e        = ESP_WIFI_SAE_MODE,
+    // .sae_h2e_identifier = EXAMPLE_H2E_IDENTIFIER,
+#ifdef CONFIG_ESP_WIFI_WPA3_COMPATIBLE_SUPPORT
+            .disable_wpa3_compatible_mode = 0,
+#endif
+                },
     };
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &sta_config));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
     gpio_config_t io_conf = {};
@@ -168,9 +187,15 @@ void app_main(void)
             if (bits & WIFI_CONNECTED_BIT)
             {
                 ESP_LOGI(TAG, "Connected to AP SSID:%s", CONFIG_ESP_WIFI_SSID);
-                connected = true;
+                sys_info.connected = true;
+                sys_info.reconn_cntr++;
 
 #if CONFIG_SYS_OTA_ENABLE
+                if (OTA_Deinit() != 0)
+                {
+                    ESP_LOGE(TAG, "OTA deinitialization error");
+                }
+
                 /* Start OTA task */
                 if (OTA_Init() != 0)
                 {
@@ -184,6 +209,8 @@ void app_main(void)
 #endif /* CONFIG_TG_EN */
 
 #if CONFIG_MQTT_EN
+                MQTT_ServiceDeinit();
+
                 /* Start MQTT service */
                 if (MQTT_ServiceInit() != MQTT_SERVICE_OK)
                 {
@@ -196,19 +223,7 @@ void app_main(void)
                 ESP_LOGI(TAG, "Failed to connect to SSID:%s", CONFIG_ESP_WIFI_SSID);
                 ESP_LOGI(TAG, "Will try to reconnect 1 min later");
 
-                connected = false;
-
-#if CONFIG_MQTT_EN
-                /* Start MQTT service */
-                MQTT_ServiceDeinit();
-#endif /* CONFIG_MQTT_EN */
-
-#if CONFIG_SYS_OTA_ENABLE
-                if (OTA_Deinit() != 0)
-                {
-                    ESP_LOGE(TAG, "OTA deinitialization error");
-                }
-#endif /* CONFIG_SYS_OTA_ENABLE */
+                sys_info.connected = false;
 
                 xTimerStart(reconn_timer, 0);
             }
@@ -216,9 +231,8 @@ void app_main(void)
 
 #if CONFIG_SYS_SENDING_PERIOD
         /* System information sending */
-        if (connected && (sys_info_tick + pdMS_TO_TICKS(CONFIG_SYS_SENDING_PERIOD) < xTaskGetTickCount()))
+        if (sys_info.connected && (sys_info_tick + pdMS_TO_TICKS(CONFIG_SYS_SENDING_PERIOD) < xTaskGetTickCount()))
         {
-            sys_info_t sys_info = {.temp = -273.F};
 #if CONFIG_SYS_TEMP_SENSOR_ENABLE
             ESP_ERROR_CHECK(temperature_sensor_get_celsius(temp_sensor, &sys_info.temp));
 #endif /* CONFIG_SYS_TEMP_SENSOR_ENABLE */
@@ -268,6 +282,7 @@ int32_t SendSysInfo(sys_info_t *sys_info)
     cJSON_AddStringToObject(message, "IdfVer", esp_get_idf_version());
     cJSON_AddNumberToObject(message, "LifeTime", pdTICKS_TO_MS(xTaskGetTickCount()) / 1000);
     cJSON_AddNumberToObject(message, "ResetReason", esp_reset_reason());
+    cJSON_AddNumberToObject(message, "ReconnCntr", sys_info->reconn_cntr);
 #if CONFIG_SYS_TEMP_SENSOR_ENABLE
     cJSON_AddNumberToObject(message, "Temp", roundf(sys_info->temp));
 #endif /* CONFIG_SYS_TEMP_SENSOR_ENABLE */
