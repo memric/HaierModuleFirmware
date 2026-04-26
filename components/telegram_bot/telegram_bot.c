@@ -356,7 +356,7 @@ int32_t TeleBot_SendMessage(uint32_t chat_id, const char *msg, cJSON *markup)
     int32_t retval = -1;
 
     /*Construct JSON method object*/
-    cJSON *message = cJSON_CreateObjectReference(NULL);
+    cJSON *message = cJSON_CreateObject();
 
     if (message != NULL)
     {

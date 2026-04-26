@@ -256,8 +256,12 @@ int32_t SendSysInfo(sys_info_t *sys_info)
 
 #if CONFIG_MQTT_EN
 
-    /*Construct JSON method object*/
-    cJSON *message                 = cJSON_CreateObjectReference(NULL);
+    /* Construct JSON method object */
+    cJSON *message = cJSON_CreateObject();
+    if (message == NULL)
+    {
+        return -1;
+    }
 
     const esp_app_desc_t *app_desc = esp_app_get_description();
     cJSON_AddStringToObject(message, "AppVer", app_desc->version);
@@ -275,10 +279,12 @@ int32_t SendSysInfo(sys_info_t *sys_info)
         retval = strlen(msg_to_send);
     }
 
-    free(msg_to_send);
+    if (msg_to_send != NULL)
+    {
+        free(msg_to_send);
+    }
 
     cJSON_Delete(message);
-
 #endif /* CONFIG_MQTT_EN */
 
     return retval;
