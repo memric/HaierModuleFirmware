@@ -55,4 +55,32 @@ menu "MQTT Configuration"
             help
                 Enable MQTT TLS.
                 mqtt_cert.pem file should be provided.
+
+        menuconfig MQTT_LWT_EN
+            bool "Enable MQTT LWT functionality"
+            default n
+            depends on MQTT_EN
+            help
+                Enable MQTT LWT functionality.
+
+            config MQTT_LWT_SUBTOPIC
+                string "LWT subtopic"
+                default "lwt"
+                depends on MQTT_LWT_EN
+                help
+                    LWT subtopic
+
+            config MQTT_LWT_ONLINE_MSG
+                string "LWT online message"
+                default "online"
+                depends on MQTT_LWT_EN
+                help
+                    LWT online message
+
+            config MQTT_LWT_PERIOD
+                int "LWT sending period"
+                default 10000
+                depends on MQTT_LWT_EN
+                help
+                    LWT sending period
 endmenu

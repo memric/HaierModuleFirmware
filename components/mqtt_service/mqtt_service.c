@@ -124,6 +124,8 @@ static void MQTT_AppStart(void)
 #if CONFIG_MQTT_TLS_EN
                      .address.transport        = MQTT_TRANSPORT_OVER_SSL,
                      .verification.certificate = (const char *) mqtt_pem_start
+#else
+                .address.transport = MQTT_TRANSPORT_OVER_TCP,
 #endif /* CONFIG_MQTT_TLS_EN */
             },
 
@@ -300,6 +302,9 @@ static void MQTT_Task(void *arg)
 #if CONFIG_HAIER_ENABLE
     haier_state_t haier_state;
 #endif /* CONFIG_HAIER_ENABLE */
+#if CONFIG_MQTT_LWT_EN
+    TickType_t lwt_tick = xTaskGetTickCount();
+#endif /* CONFIG_MQTT_LWT_EN */
 
     while (1)
     {
@@ -390,5 +395,15 @@ static void MQTT_Task(void *arg)
 #else
         vTaskDelay(pdMS_TO_TICKS(1000));
 #endif /* CONFIG_HAIER_ENABLE */
+
+#if CONFIG_MQTT_LWT_EN
+        if (lwt_tick + pdMS_TO_TICKS(CONFIG_MQTT_LWT_PERIOD) < xTaskGetTickCount())
+        {
+            /* Send state topic */
+            MQTT_Send(CONFIG_MQTT_LWT_SUBTOPIC, CONFIG_MQTT_LWT_ONLINE_MSG);
+
+            lwt_tick = xTaskGetTickCount();
+        }
+#endif /* CONFIG_MQTT_LWT_EN */
     }
 }
