@@ -38,13 +38,6 @@
     }
 #define LED_OFF() gpio_set_level(LED_PIN, 0)
 
-/* FreeRTOS event group to signal when we are connected */
-static EventGroupHandle_t s_wifi_event_group;
-static int s_retry_num            = 0;
-static TimerHandle_t reconn_timer = NULL;
-static TimerHandle_t led_timer    = NULL;
-static const char *TAG            = "MAIN";
-
 typedef struct
 {
 #if CONFIG_SYS_TEMP_SENSOR_ENABLE
@@ -52,7 +45,23 @@ typedef struct
 #endif                    /* CONFIG_SYS_TEMP_SENSOR_ENABLE */
     uint32_t reconn_cntr; /*! Reconnect counter */
     bool connected;       /*! Connected */
+    char ip_addr[16];     /*! IP address string */
 } sys_info_t;
+
+/* FreeRTOS event group to signal when we are connected */
+static EventGroupHandle_t s_wifi_event_group;
+static int s_retry_num            = 0;
+static TimerHandle_t reconn_timer = NULL;
+static TimerHandle_t led_timer    = NULL;
+static const char *TAG            = "MAIN";
+static sys_info_t sys_info        = {
+#if CONFIG_SYS_TEMP_SENSOR_ENABLE
+    .temp = -273.F,
+#endif /* CONFIG_SYS_TEMP_SENSOR_ENABLE */
+    .reconn_cntr = 0,
+    .connected   = false,
+    .ip_addr     = {'\0'}
+};
 
 void ReconnectTimerCallback(TimerHandle_t xTimer);
 void LedTimerCallback(TimerHandle_t xTimer);
@@ -82,6 +91,10 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+
+        snprintf(sys_info.ip_addr, sizeof(sys_info.ip_addr), IPSTR, IP2STR(&event->ip_info.ip));
+        sys_info.ip_addr[sizeof(sys_info.ip_addr)- 1] = '\0';
+
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
@@ -92,10 +105,9 @@ void app_main(void)
 #if CONFIG_SYS_SENDING_PERIOD
     TickType_t sys_info_tick = xTaskGetTickCount();
 #endif /* CONFIG_SYS_SENDING_PERIOD */
-    sys_info_t sys_info = {.temp = -273.F, .reconn_cntr = 0, .connected = false};
 
     /* Initialize NVS */
-    esp_err_t ret       = nvs_flash_init();
+    esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -286,6 +298,12 @@ int32_t SendSysInfo(sys_info_t *sys_info)
 #if CONFIG_SYS_TEMP_SENSOR_ENABLE
     cJSON_AddNumberToObject(message, "Temp", roundf(sys_info->temp));
 #endif /* CONFIG_SYS_TEMP_SENSOR_ENABLE */
+    cJSON_AddStringToObject(message, "IP", sys_info->ip_addr);
+
+    /* Get WiFi RSSI */
+    wifi_ap_record_t ap_info;
+    ESP_ERROR_CHECK(esp_wifi_sta_get_ap_info(&ap_info));
+    cJSON_AddNumberToObject(message, "WiFiRSSI", ap_info.rssi);
 
     char *msg_to_send = cJSON_PrintUnformatted(message);
 

@@ -198,7 +198,7 @@ static void MQTT_DataReceived(char *topic, int tlen, char *data, int dlen)
     value_str[dlen] = '\0';
 
     /* Reboot request */
-    if (MQTT_CHECK_STR(topic, "set/restart", tlen))
+    if (MQTT_CHECK_STR(topic, CONFIG_MQTT_TOPIC "/set/restart", tlen))
     {
         ESP_LOGI(TAG, "Restart command received");
         esp_restart();
@@ -245,6 +245,19 @@ static void MQTT_DataReceived(char *topic, int tlen, char *data, int dlen)
         {
             Haier_Cmd(HAIER_FAN, (uint8_t) value);
         }
+    }
+    else if (MQTT_CHECK_STR(topic, CONFIG_MQTT_TOPIC "/set/deflector", tlen))
+    {
+        value = atoi(value_str);
+        ESP_LOGI(TAG, "Deflector request. Value %d", value);
+        if (value < 4) // TODO
+        {
+            Haier_Cmd(HAIER_DEFLECTOR, (uint8_t) value);
+        }
+    }
+    else
+    {
+        ESP_LOGI(TAG, "Unresolved request");
     }
 }
 
@@ -382,6 +395,8 @@ static void MQTT_Task(void *arg)
 #else
                 cJSON_AddNumberToObject(message, "Fan", haier_state.fan_speed);
 #endif /* CONFIG_FAN_SPEED_AS_STRING */
+                cJSON_AddNumberToObject(message, "Deflector", haier_state.deflector);
+
 
                 char *json_str = cJSON_PrintUnformatted(message);
 

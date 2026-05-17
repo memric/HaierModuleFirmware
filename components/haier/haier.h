@@ -19,6 +19,7 @@ typedef enum
     HAIER_TEMP,
     HAIER_MODE,
     HAIER_FAN,
+    HAIER_DEFLECTOR,
 } cmd_t;
 
 typedef struct
@@ -28,6 +29,7 @@ typedef struct
     uint8_t mode;      /*!< Mode: Dry/Heat/Cool*/
     uint8_t fan_speed; /*!< Fan speed mode*/
     uint8_t en;        /*!< Enabled */
+    uint8_t deflector; /*!< Deflector mode */
 } haier_state_t;
 
 uint32_t Haier_Init(void);

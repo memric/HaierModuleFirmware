@@ -1,11 +1,47 @@
 Haier Module
 ====================
 
-Haier Air Conditioner [remote controller](https://github.com/memric/HaierModule) firmware.
+ESP-IDF based firmware for the Haier air conditioner remote control. It includes the MQTT client to integrate with popular smart home solutions.
 
-Based on the [ESP32 Telegram bot](https://github.com/memric/ESP32_Telegrambot) project.
+The firmware is designed for use with [remote controller](https://github.com/memric/HaierModule) but can be easily ported to other ESP32-based hardware.
+
+## Haier protocol
+
+**Common frame structure (known fields)**
+
+| Index  | Value | Description            | Note                                                                | Supported |
+|--------|-------|------------------------|---------------------------------------------------------------------|-----------|
+| 0      | 0xFF  | Frame separator        |                                                                     |           |
+| 1      | 0xFF  | Frame separator        |                                                                     |           |
+| 2      |       | Payload length         | Packet size - 3 bytes of Header and Checksum                        |           |
+| 3      | 0x00  | Dummy byte             |                                                                     |           |
+| 4      | 0x00  | Dummy byte             |                                                                     |           |
+| 5      | 0x00  | Dummy byte             |                                                                     |           |
+| 6      | 0x00  | Dummy byte             |                                                                     |           |
+| 7      | 0x00  | Dummy byte             |                                                                     |           |
+| 8      | 0x01  | Dummy byte             |                                                                     |           |
+| 9      |       | Frame type (direction) | 0x01 - Request, 0x02 - Responce                                     |           |
+| 10     |       | Frame type (direction) | 0x4D - Request, 0x6D - Responce                                     |           |
+| 11     |       | Command                | 0x5F on request                                                     |           |
+| 12     |       | ?                      |                                                                     |           |
+| 13     |       | Current temperature    |                                                                     | ✅        |
+| 14..22 |       | ?                      |                                                                     |           |
+| 23     |       | Mode                   | 0x00 - Smart, 0x01 - Cool, 0x02 - Heat, 0x03 - Fan only, 0x04 - Dry | ✅        |
+| 24     |       | ?                      |                                                                     |           |
+| 25     |       | Fan speed              | 0x00 - Max, 0x01 - Medium, 0x02 - Min, 0x03 - Auto                  | ✅        |
+| 26     |       | ?                      |                                                                     |           |
+| 27     |       | Deflector              | 0x00 - Stationary, 0x01 - Vertical, 0x02 - Horizontal, 0x03 - Auto  | ✅        |
+| 28     |       | ?                      | ? Pult lock ?                                                       | ❌        |
+| 29     |       | Enabled                | 0x00 - Off, 0x_1 - On, ...?                                         | ✅        |
+| 30     |       | ?                      |                                                                     |           |
+| 31     |       | Fresh ?                | 0x00 - Off, 0x01 - On                                               | ❌        |
+| 32..34 |       | ?                      |                                                                     |           |
+| 35     |       | Temperature setting    | Desired temperature - 16º                                           | ✅        |
+| 36     |       | Checksum               | The sum of bytes above                                              |           |
 
 ## Building
+
+Use ESP IDF Programming guide and [Get Started](https://docs.espressif.com/projects/esp-idf/en/v6.0.1/esp32c3/get-started/index.html) page to install and setup ESP-IDF.
 
 ### Set up and configure the project
 

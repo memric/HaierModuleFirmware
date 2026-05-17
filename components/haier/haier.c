@@ -51,6 +51,7 @@ I (28998) HAIER: 0x3fc95580   00 37 00 09 70                                    
 #define HAIER_ROOM_TEMP_OFFSET              13U
 #define HAIER_MODE_OFFSET                   23U
 #define HAIER_FAN_OFFSET                    25U
+#define HAIER_DEFLECTOR_OFFSET              27U
 #define HAIER_ENABLED_OFFSET                29U
 #define HAIER_SET_TEMP_OFFSET               35U
 #define HAIER_SET_BYTE(buff, offset, value) (buff)[offset] = (value)
@@ -75,6 +76,8 @@ I (28998) HAIER: 0x3fc95580   00 37 00 09 70                                    
 #define HAIER_GET_FAN(buff)                 HAIER_GET_BYTE(buff, HAIER_FAN_OFFSET)
 #define HAIER_SET_TEMP(buff, temp)          HAIER_SET_BYTE(buff, HAIER_SET_TEMP_OFFSET, temp - 16U)
 #define HAIER_GET_TEMP(buff)                HAIER_GET_BYTE(buff, HAIER_SET_TEMP_OFFSET) + 16U
+#define HAIER_SET_DEFLECTOR(buff, mode)     HAIER_SET_BYTE(buff, HAIER_DEFLECTOR_OFFSET, mode)
+#define HAIER_GET_DEFLECTOR(buff)           HAIER_GET_BYTE(buff, HAIER_DEFLECTOR_OFFSET)
 
 typedef struct
 {
@@ -169,6 +172,7 @@ uint32_t Haier_ProtocolParser(const uint8_t *data, uint16_t len, haier_state_t *
     state->mode      = HAIER_GET_MODE(data);
     state->fan_speed = HAIER_GET_FAN(data);
     state->temp_set  = HAIER_GET_TEMP(data);
+    state->deflector = HAIER_GET_DEFLECTOR(data);
 
     return HAIER_ERR_OK;
 }
@@ -263,6 +267,9 @@ uint8_t Haier_PrepareRequest(uint8_t *data, const uint8_t *state, uint8_t cmd, u
             break;
         case HAIER_FAN:
             HAIER_SET_FAN(data, value);
+            break;
+        case HAIER_DEFLECTOR:
+            HAIER_SET_DEFLECTOR(data, value);
             break;
         default:
             break;
