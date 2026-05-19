@@ -39,6 +39,37 @@ The firmware is designed for use with [remote controller](https://github.com/mem
 | 35     |       | Temperature setting    | Desired temperature - 16º                                           | ✅        |
 | 36     |       | Checksum               | The sum of bytes above                                              |           |
 
+## MQTT
+
+The device periodically sends MQTT messages using the configured topic (by default, `haier`) and the `sys` and `state` subtopics.
+
+The `haier/sys` topic includes a paylod in JSON format which contains some system information:
+
+```json
+{"AppVer":"0.1.0","IdfVer":"v6.0","LifeTime":79317,"ResetReason":4,"ReconnCntr":1,"Temp":36,"IP":"192.168.1.100","WiFiRSSI":-27}
+```
+
+The `haier/state` topic includes a paylod in JSON format which contains AC state:
+
+```json
+{"Enabled":0,"TempCurr":26,"TempSet":24,"Mode":1,"Fan":3,"Deflector":2}
+```
+
+The `set/#` subtopic is used for control commands. For example to set AC desired temperature send the tempemperature value with topic `haier/set/temp`.
+
+The table below contains a list of supported command topics.
+
+| Topic                 | Value                                        | Description                  |
+|-----------------------|----------------------------------------------|------------------------------|
+| `haier/set/restart`   |                                              | Restarts module              |
+| `haier/set/enable`    | `1` or `on` - enable, `0` or `off` - disable | Enable/disable AC            |
+| `haier/set/temp`      | `[16..30)`                                   | Desired AC temperature value |
+| `haier/set/mode`      | See the ***Haier protocol table*** above     | AC mode (Heat/cool/fan etc.) |
+| `haier/set/fan`       | See the ***Haier protocol table*** above     | AC fan speed mode            |
+| `haier/set/deflector` | See the ***Haier protocol table*** above     | AC deflector mode            |
+
+Also the `haier/lwt` topic is exists which periodically sends `online` message to control device connection. 
+
 ## Building
 
 Use ESP IDF Programming guide and [Get Started](https://docs.espressif.com/projects/esp-idf/en/v6.0.1/esp32c3/get-started/index.html) page to install and setup ESP-IDF.
