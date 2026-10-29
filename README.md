@@ -1,5 +1,8 @@
 # Haier Module
 
+![Build](https://img.shields.io/github/actions/workflow/status/memric/HaierModuleFirmware/build.yml?branch=master)
+<!-- ![Release](https://img.shields.io/github/v/release/memric/HaierModuleFirmware) -->
+
 ESP-IDF based firmware for WiFi control of Haier air conditioners via MQTT. This project enables integration with popular smart home solutions.
 
 ## Overview
@@ -61,14 +64,14 @@ Published periodically with system status:
 
 ```json
 {
-  "AppVer": "0.1.0",
-  "IdfVer": "v6.0",
-  "LifeTime": 79317,
-  "ResetReason": 4,
-  "ReconnCntr": 1,
-  "Temp": 36,
-  "IP": "192.168.1.100",
-  "WiFiRSSI": -27
+  "app": "0.1.0",
+  "idf": "v6.0",
+  "lifetime": "1d 2h 3m 4s",
+  "reset_reason": 4,
+  "recon": 1,
+  "temp": 36,
+  "ip": "192.168.1.100",
+  "rssi": -27
 }
 ```
 
