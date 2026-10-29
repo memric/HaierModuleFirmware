@@ -290,20 +290,56 @@ int32_t SendSysInfo(sys_info_t *sys_info)
     }
 
     const esp_app_desc_t *app_desc = esp_app_get_description();
-    cJSON_AddStringToObject(message, "AppVer", app_desc->version);
-    cJSON_AddStringToObject(message, "IdfVer", esp_get_idf_version());
-    cJSON_AddNumberToObject(message, "LifeTime", pdTICKS_TO_MS(xTaskGetTickCount()) / 1000);
-    cJSON_AddNumberToObject(message, "ResetReason", esp_reset_reason());
-    cJSON_AddNumberToObject(message, "ReconnCntr", sys_info->reconn_cntr);
+    cJSON_AddStringToObject(message, "app", app_desc->version);
+    cJSON_AddStringToObject(message, "idf", esp_get_idf_version());
+
+    /* Calculate lifetime in days, hours, minutes, and seconds */
+    uint32_t lifetime_seconds = pdTICKS_TO_MS(xTaskGetTickCount()) / 1000;
+    uint32_t days = lifetime_seconds / 86400;
+    uint32_t hours = (lifetime_seconds % 86400) / 3600;
+    uint32_t minutes = (lifetime_seconds % 3600) / 60;
+    uint32_t seconds = lifetime_seconds % 60;
+    char lifetime_str[32];
+    snprintf(lifetime_str, sizeof(lifetime_str), "%lud %luh %lum %lus", days, hours, minutes, seconds);
+    cJSON_AddStringToObject(message, "lifetime", lifetime_str);
+
+    cJSON_AddNumberToObject(message, "recon", sys_info->reconn_cntr);
 #if CONFIG_SYS_TEMP_SENSOR_ENABLE
-    cJSON_AddNumberToObject(message, "Temp", roundf(sys_info->temp));
+    cJSON_AddNumberToObject(message, "temp", roundf(sys_info->temp));
 #endif /* CONFIG_SYS_TEMP_SENSOR_ENABLE */
-    cJSON_AddStringToObject(message, "IP", sys_info->ip_addr);
+    cJSON_AddStringToObject(message, "ip", sys_info->ip_addr);
 
     /* Get WiFi RSSI */
     wifi_ap_record_t ap_info;
-    ESP_ERROR_CHECK(esp_wifi_sta_get_ap_info(&ap_info));
-    cJSON_AddNumberToObject(message, "WiFiRSSI", ap_info.rssi);
+    if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK)
+    {
+        cJSON_AddNumberToObject(message, "rssi", ap_info.rssi);
+    }
+    else
+    {
+        cJSON_AddNumberToObject(message, "rssi", 0);
+    }
+
+    switch (esp_reset_reason())
+    {
+    case ESP_RST_POWERON:
+        cJSON_AddStringToObject(message, "reset_reason", "poweron");
+        break;
+    case ESP_RST_SW:
+        cJSON_AddStringToObject(message, "reset_reason", "software");
+        break;
+    case ESP_RST_WDT:
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_INT_WDT:
+        cJSON_AddStringToObject(message, "reset_reason", "watchdog");
+        break;
+    case ESP_RST_PANIC:
+        cJSON_AddStringToObject(message, "reset_reason", "panic");
+        break;
+    default:
+        cJSON_AddStringToObject(message, "reset_reason", "unknown");
+        break;
+    }
 
     char *msg_to_send = cJSON_PrintUnformatted(message);
 

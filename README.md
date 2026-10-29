@@ -74,14 +74,14 @@ Published periodically with system status:
 
 | Field | Description |
 |-------|-------------|
-| `AppVer` | Firmware application version |
-| `IdfVer` | ESP-IDF version |
-| `LifeTime` | Uptime in seconds |
-| `ResetReason` | ESP reset reason code |
-| `ReconnCntr` | WiFi connection attempts |
-| `Temp` | SoC temperature in °C |
-| `IP` | Device IP address |
-| `WiFiRSSI` | WiFi signal strength (dBm) |
+| `app` | Firmware application version |
+| `idf` | ESP-IDF version |
+| `lifetime` | Uptime in seconds |
+| `reset_reason` | ESP reset reason code |
+| `recon` | WiFi connection attempts |
+| `temp` | SoC temperature in °C |
+| `ip` | Device IP address |
+| `rssi` | WiFi signal strength (dBm) |
 
 ### AC State (`haier/state`)
 
