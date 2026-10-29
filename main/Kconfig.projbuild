@@ -1,17 +1,4 @@
 menu "Controller Configuration"
-
-    config ESP_WIFI_SSID
-        string "WiFi SSID"
-        default "myssid"
-        help
-        SSID (network name) for the example to connect to.
-
-    config ESP_WIFI_PASSWORD
-        string "WiFi Password"
-        default "mypassword"
-        help
-        WiFi password (WPA or WPA2) for the example to use.
-
     config SYS_SENDING_PERIOD
         int "System Information sending period, ms"
         default 5000
@@ -23,10 +10,4 @@ menu "Controller Configuration"
         default y
         help
             Enable SoC temperature sensor.
-
-    config SYS_OTA_ENABLE
-        bool "Enable OTA thrue WiFi & FWTP"
-        default y
-        help
-            Enable OTA thrue WiFi & FWTP.
 endmenu

@@ -1,0 +1,26 @@
+menu "WiFi Configuration"
+
+    config WIFI_SSID
+        string "WiFi SSID"
+        default "myssid"
+        help
+            SSID (network name) for the example to connect to.
+
+    config WIFI_PASSWORD
+        string "WiFi Password"
+        default "mypassword"
+        help
+            WiFi password (WPA or WPA2) for the example to use.
+
+    config WIFI_RECONNECT_TIMER
+        int "Reconnect timeout, s"
+        default 60
+        help
+            Reconnect timeout, s.
+
+    config SYS_OTA_ENABLE
+        bool "Enable OTA thrue WiFi & FWTP"
+        default y
+        help
+            Enable OTA thrue WiFi & FWTP.
+endmenu
